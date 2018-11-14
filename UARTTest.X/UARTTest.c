@@ -1,6 +1,13 @@
 /* 
  * File:   UARTTest.c
  * Author: dantech
+ * 
+ * Pin config:
+ * RA1 -> USB TX (Green wire)
+ * RB10 -> USB RX (White wire)
+ * 
+ * RA2 -> ESP TX
+ * RB7 -> ESP RX
  *
  * Created on November 1, 2018, 2:14 PM
  */
@@ -20,15 +27,21 @@
 #pragma config FSOSCEN = OFF  //PINS 11 and 12 to secondary oscillator!
 #pragma config DEBUG = OFF   // RB4 and RB5
 //==============================================================
-// Protothreads configure
 
-// IF use_vref_debug IS defined, pin 25 is Vref output
-//#define use_vref_debug
+volatile unsigned int time_tick_millsec;
 
-// IF use_uart_serial IS defined, pin 21 and pin 22 are used by the uart
-//#define use_uart_serial
+void __ISR(_TIMER_5_VECTOR, IPL2AUTO) Timer5Handler(void) {
+    // clear the interrupt flag
+    mT5ClearIntFlag();
+    //count milliseconds
+    time_tick_millsec++ ;
+}
+
 #define COMP_BAUDRATE 9600 // must match PC terminal emulator setting
 #define ESP_BAUDRATE 115200
+
+#define UART_ESP UART1
+#define UART_COMP UART2
 
 /////////////////////////////////
 // set up clock parameters
@@ -53,6 +66,87 @@
 #define red_text printf("\x1b[31m")
 #define rev_text printf("\x1b[7m")
 #define normal_text printf("\x1b[0m")
+
+
+#define BUFFER_SIZE 1024
+static char read_buffer[BUFFER_SIZE];
+static int buf_ptr = 0;
+
+// 5 seconds
+#define DEFAULT_TIMEOUT 5000
+
+/**
+ * 
+ * @param timeout
+ * @return 0 if newline seen, 1 if buffer overflowed, 2 if timed out
+ */
+int get_line(int timeout, UART_MODULE m) {
+  static int start_time;
+  start_time = time_tick_millsec;
+  buf_ptr = 0;
+  while(1) {
+    if(UARTReceivedDataIsAvailable(m)) {
+      // reset timeout when we get a character
+      start_time = time_tick_millsec;
+      
+      // read the character
+      char character = UARTGetDataByte(m);
+      // put it in the buffer
+      read_buffer[buf_ptr++] = character;
+      
+      // check for line termination
+      if (m == UART_COMP) {
+        // echo the character to the screen
+        send_byte(character, m);
+        // response ends in \r\n
+        if (buf_ptr >= 1 && character == '\r') {
+          send_byte('\n', m);
+          read_buffer[buf_ptr] = '\0';
+          return 0;
+        }
+      } else {
+        // response ends in \r\n
+        if (buf_ptr >= 2 && read_buffer[buf_ptr-2] == '\r' && character == '\n') {
+          read_buffer[buf_ptr] = '\0';
+          return 0;
+        }
+      }
+      if (buf_ptr == BUFFER_SIZE-1) {
+        read_buffer[buf_ptr] = '\0';
+        return 1;
+      }
+    }
+    if (time_tick_millsec - start_time > timeout) {
+      return 2;
+    }
+  }
+}
+
+void send_byte(char b, UART_MODULE m) {
+  while(!UARTTransmitterIsReady(m));
+  UARTSendDataByte(m, b);
+}
+
+void send_cmd(char* cmd, UART_MODULE m) {
+  while(*cmd != NULL) {
+    send_byte(*(cmd++), m);
+  }
+  send_byte('\r', m);
+  send_byte('\n', m);
+}
+
+void echo_byte_buff() {
+  static int i;
+  static char intbuff[32];
+  for(i = 0; i < buf_ptr; i++) {
+    sprintf(intbuff, "Char: %d", (unsigned int) read_buffer[i]);
+    send_cmd(intbuff, UART_COMP);
+  }
+}
+
+void setup() {
+  send_cmd("Hello world", UART_COMP);
+}
 
 int main(void) {
   
@@ -85,52 +179,65 @@ int main(void) {
   UARTSetDataRate(UART1, pb_clock, ESP_BAUDRATE);
   UARTEnable(UART1, UART_ENABLE_FLAGS(UART_PERIPHERAL | UART_RX | UART_TX));
   
-  // set Key pin, default to high (AT mode)
-//  mPORTBSetPinsDigitalOut(BIT_8);
-//  mPORTBClearBits(BIT_8);
-//  mPORTBSetBits(BIT_8);
+  // ===Set up timer5 ======================
+  // timer 5: on,  interrupts, internal clock, 
+  // set up to count millsec
+  OpenTimer5(T5_ON  | T5_SOURCE_INT | T5_PS_1_1 , pb_clock/1000);
+  // set up the timer interrupt with a priority of 2
+  ConfigIntTimer5(T5_INT_ON | T5_INT_PRIOR_2);
+  mT5ClearIntFlag(); // and clear the interrupt flag
+  // zero the system time tick
+  time_tick_millsec = 0;
   
-  char buffer[128];
-  int bptr = 0;
+  // enable system wide interrupts
+  INTEnableSystemMultiVectoredInt();
+
+  setup();
 
   while(1) {
-    // check if char available from computer
-    if(UARTReceivedDataIsAvailable(UART2)) {
-      char character = UARTGetDataByte(UART2);
-      while(!UARTTransmitterIsReady(UART2));
-      UARTSendDataByte(UART2, character);
-      buffer[bptr++] = character;
-      if(character == '\r'){
-        while(!UARTTransmitterIsReady(UART2));
-        UARTSendDataByte(UART2, '\n');
-//        if (buffer[0] == 'd' && buffer[1] == 'a' && buffer[2] == 't' && buffer[3] == '\r') {
-//          // set to low: data mode
-//          mPORTBClearBits(BIT_8);
-//        } else if (buffer[0] == 'c' && buffer[1] == 'm' && buffer[2] == 'd' && buffer[3] == '\r') {
-//          // set to high: command mode
-//          mPORTBSetBits(BIT_8);
-//        } else {        
-          buffer[bptr++] = '\n';
-
-          int i;
-          for(i = 0; i < bptr; i++) {
-            // send to the computer
-            while(!UARTTransmitterIsReady(UART1));
-            UARTSendDataByte(UART1, buffer[i]); 
-//          }          
-        }
-        // reset buffer
-        bptr = 0; 
-      }
+    if (get_line(DEFAULT_TIMEOUT, UART_COMP) == 2) {
+      send_cmd("Timeout", UART_COMP);
     }
+    if (strcmp(read_buffer, "abc\r") == 0) {
+      send_cmd("Got some juice", UART_COMP);
+    }
+    // check if char available from computer
+//    if(UARTReceivedDataIsAvailable()) {
+//      char character = UARTGetDataByte(UART2);
+//      while(!UARTTransmitterIsReady(UART2));
+//      UARTSendDataByte(UART2, character);
+//      buffer[bptr++] = character;
+//      if(character == '\r'){
+//        while(!UARTTransmitterIsReady(UART2));
+//        UARTSendDataByte(UART2, '\n');
+////        if (buffer[0] == 'd' && buffer[1] == 'a' && buffer[2] == 't' && buffer[3] == '\r') {
+////          // set to low: data mode
+////          mPORTBClearBits(BIT_8);
+////        } else if (buffer[0] == 'c' && buffer[1] == 'm' && buffer[2] == 'd' && buffer[3] == '\r') {
+////          // set to high: command mode
+////          mPORTBSetBits(BIT_8);
+////        } else {        
+//          buffer[bptr++] = '\n';
+//
+//          int i;
+//          for(i = 0; i < bptr; i++) {
+//            // send to the computer
+//            while(!UARTTransmitterIsReady(UART1));
+//            UARTSendDataByte(UART1, buffer[i]); 
+////          }          
+//        }
+//        // reset buffer
+//        bptr = 0; 
+//      }
+//    }
     
     // check if char available from bluetooth
-    if(UARTReceivedDataIsAvailable(UART1)) {
-      char character = UARTGetDataByte(UART1);
-      // send to the computer
-      while(!UARTTransmitterIsReady(UART2));
-      UARTSendDataByte(UART2, character);
-    }
+//    if(UARTReceivedDataIsAvailable(UART1)) {
+//      char character = UARTGetDataByte(UART1);
+//      // send to the computer
+//      while(!UARTTransmitterIsReady(UART2));
+//      UARTSendDataByte(UART2, character);
+//    }
   }
 }
 

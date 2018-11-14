@@ -48,10 +48,10 @@ def read_loop(resp=False):
 				print("error decoding")
 			
 
-mod = "blue"
+mod = "black"
 
 if mod == "blue":
-	port = "/dev/cu.SLAB_USBtoUART20"
+	port = "/dev/cu.SLAB_USBtoUART"
 	speed = "115200"
 
 	ser = serial.Serial(port,speed)
