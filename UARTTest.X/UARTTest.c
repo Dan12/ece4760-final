@@ -27,7 +27,8 @@
 
 // IF use_uart_serial IS defined, pin 21 and pin 22 are used by the uart
 //#define use_uart_serial
-#define BAUDRATE 9600 // must match PC terminal emulator setting
+#define COMP_BAUDRATE 9600 // must match PC terminal emulator setting
+#define ESP_BAUDRATE 115200
 
 /////////////////////////////////
 // set up clock parameters
@@ -71,7 +72,7 @@ int main(void) {
 
   UARTConfigure(UART2, UART_ENABLE_PINS_TX_RX_ONLY);
   UARTSetLineControl(UART2, UART_DATA_SIZE_8_BITS | UART_PARITY_NONE | UART_STOP_BITS_1);
-  UARTSetDataRate(UART2, pb_clock, BAUDRATE);
+  UARTSetDataRate(UART2, pb_clock, COMP_BAUDRATE);
   UARTEnable(UART2, UART_ENABLE_FLAGS(UART_PERIPHERAL | UART_RX | UART_TX));
   
   // === init the uart1 ===================
@@ -81,7 +82,7 @@ int main(void) {
  
   UARTConfigure(UART1, UART_ENABLE_PINS_TX_RX_ONLY);
   UARTSetLineControl(UART1, UART_DATA_SIZE_8_BITS | UART_PARITY_NONE | UART_STOP_BITS_1);
-  UARTSetDataRate(UART1, pb_clock, BAUDRATE);
+  UARTSetDataRate(UART1, pb_clock, ESP_BAUDRATE);
   UARTEnable(UART1, UART_ENABLE_FLAGS(UART_PERIPHERAL | UART_RX | UART_TX));
   
   // set Key pin, default to high (AT mode)
