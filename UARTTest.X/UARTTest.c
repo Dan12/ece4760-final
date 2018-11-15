@@ -6,8 +6,8 @@
  * RA1 -> USB TX (Green wire)
  * RB10 -> USB RX (White wire)
  * 
- * RA2 -> ESP TX
- * RB7 -> ESP RX
+ * RA2 -> ESP TX (next to GND)
+ * RB7 -> ESP RX (next to VCC)
  *
  * Created on November 1, 2018, 2:14 PM
  */
@@ -75,14 +75,33 @@ static int buf_ptr = 0;
 // 5 seconds
 #define DEFAULT_TIMEOUT 5000
 
+void send_byte(char b, UART_MODULE m) {
+  while(!UARTTransmitterIsReady(m));
+  UARTSendDataByte(m, b);
+}
+
+int ends_with(char* buf, int buf_len, char* term, int term_len) {
+  int i;
+  int ti = term_len-1;
+  for (i = buf_len-1; i >= 0 && ti >= 0; i--, ti--) {
+    if (buf[i] != term[ti]) {
+      return 1;
+    }
+  }
+  return 0;
+}
+
 /**
  * 
  * @param timeout
  * @return 0 if newline seen, 1 if buffer overflowed, 2 if timed out
  */
-int get_line(int timeout, UART_MODULE m) {
+int get_line(int timeout, UART_MODULE m, char* term, int echo) {
   static int start_time;
   start_time = time_tick_millsec;
+  
+  int term_len = strlen(term);
+  
   buf_ptr = 0;
   while(1) {
     if(UARTReceivedDataIsAvailable(m)) {
@@ -94,23 +113,21 @@ int get_line(int timeout, UART_MODULE m) {
       // put it in the buffer
       read_buffer[buf_ptr++] = character;
       
-      // check for line termination
-      if (m == UART_COMP) {
+      if (echo == 1) {
         // echo the character to the screen
         send_byte(character, m);
-        // response ends in \r\n
-        if (buf_ptr >= 1 && character == '\r') {
-          send_byte('\n', m);
-          read_buffer[buf_ptr] = '\0';
-          return 0;
-        }
-      } else {
-        // response ends in \r\n
-        if (buf_ptr >= 2 && read_buffer[buf_ptr-2] == '\r' && character == '\n') {
-          read_buffer[buf_ptr] = '\0';
-          return 0;
-        }
       }
+      
+      // check for termination
+      if (ends_with(read_buffer, buf_ptr, term, term_len) == 0) {
+        if (echo == 1 && m == UART_COMP) {
+          send_byte('\n', m);
+        }
+        read_buffer[buf_ptr] = '\0';
+        return 0;
+      }
+      
+      // check for termination
       if (buf_ptr == BUFFER_SIZE-1) {
         read_buffer[buf_ptr] = '\0';
         return 1;
@@ -122,11 +139,11 @@ int get_line(int timeout, UART_MODULE m) {
   }
 }
 
-void send_byte(char b, UART_MODULE m) {
-  while(!UARTTransmitterIsReady(m));
-  UARTSendDataByte(m, b);
-}
-
+/**
+ * Sends the command cmd with a \r\n to UART module m
+ * @param cmd
+ * @param m
+ */
 void send_cmd(char* cmd, UART_MODULE m) {
   while(*cmd != NULL) {
     send_byte(*(cmd++), m);
@@ -144,8 +161,43 @@ void echo_byte_buff() {
   }
 }
 
-void setup() {
-  send_cmd("Hello world", UART_COMP);
+static int most_recent_result = 0;
+
+void echo_buff() {
+  static char result_buff[32];
+  sprintf(result_buff, "Result: %d", most_recent_result);
+  send_cmd(result_buff, UART_COMP);
+  send_cmd(read_buffer, UART_COMP);
+}
+
+#define SEND_CMD_AND_ECHO(cmd) \
+send_cmd(cmd, UART_ESP); \
+most_recent_result = get_line(DEFAULT_TIMEOUT, UART_ESP, "OK\r\n", 0); \
+if (most_recent_result != 0) return 1; \
+echo_buff()
+
+int setup() {
+  send_cmd("Initiating connection", UART_COMP);
+  
+  SEND_CMD_AND_ECHO("AT");
+          
+  SEND_CMD_AND_ECHO("AT");
+          
+  SEND_CMD_AND_ECHO("AT+GMR");
+  
+//  send_cmd("AT", UART_ESP);
+//  most_recent_result = get_line(DEFAULT_TIMEOUT, UART_ESP, "OK\r\n", 0);
+//  echo_buff();
+//  
+//  send_cmd("AT", UART_ESP);
+//  most_recent_result = get_line(DEFAULT_TIMEOUT, UART_ESP, "OK\r\n", 0);
+//  echo_buff();
+//  
+//  send_cmd("AT+GMR", UART_ESP);
+//  most_recent_result = get_line(DEFAULT_TIMEOUT, UART_ESP, "OK\r\n", 0);
+//  echo_buff();
+  
+  return 0;
 }
 
 int main(void) {
@@ -192,15 +244,19 @@ int main(void) {
   // enable system wide interrupts
   INTEnableSystemMultiVectoredInt();
 
-  setup();
+  if (setup() == 0) {
+    send_cmd("Successfully finished setup", UART_COMP); 
+  } else {
+    send_cmd("Setup failed", UART_COMP); 
+  }
 
   while(1) {
-    if (get_line(DEFAULT_TIMEOUT, UART_COMP) == 2) {
-      send_cmd("Timeout", UART_COMP);
-    }
-    if (strcmp(read_buffer, "abc\r") == 0) {
-      send_cmd("Got some juice", UART_COMP);
-    }
+//    if (get_line(DEFAULT_TIMEOUT, UART_COMP) == 2) {
+//      send_cmd("Timeout", UART_COMP);
+//    }
+//    if (strcmp(read_buffer, "abc\r") == 0) {
+//      send_cmd("Got some juice", UART_COMP);
+//    }
     // check if char available from computer
 //    if(UARTReceivedDataIsAvailable()) {
 //      char character = UARTGetDataByte(UART2);
