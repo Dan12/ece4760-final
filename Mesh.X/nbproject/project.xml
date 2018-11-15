@@ -3,12 +3,12 @@
     <type>com.microchip.mplab.nbide.embedded.makeproject</type>
     <configuration>
         <data xmlns="http://www.netbeans.org/ns/make-project/1">
-            <name>UARTTest</name>
-            <creation-uuid>72670c4e-6c69-4845-bcad-662aa35ce0ea</creation-uuid>
+            <name>Mesh</name>
+            <creation-uuid>9160c2b3-1ded-44a9-94e0-61215b28e91f</creation-uuid>
             <make-project-type>0</make-project-type>
             <c-extensions>c</c-extensions>
             <cpp-extensions/>
-            <header-extensions/>
+            <header-extensions>h</header-extensions>
             <asminc-extensions/>
             <sourceEncoding>ISO-8859-1</sourceEncoding>
             <make-dep-projects/>
