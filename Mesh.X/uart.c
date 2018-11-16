@@ -1,6 +1,7 @@
 #include "uart.h"
 #include "timer.h"
 #include "system.h"
+#include "string_util.h"
 
 #define DMA_BUFFER_SIZE 2048
 volatile char dma_buffer[DMA_BUFFER_SIZE];
@@ -21,29 +22,18 @@ void send_byte(char b, UART_MODULE m) {
   UARTSendDataByte(m, b);
 }
 
-int ends_with(char* buf, int buf_len, char* term, int term_len) {
-  int i;
-  int ti = term_len-1;
-  for (i = buf_len-1; i >= 0 && ti >= 0; i--, ti--) {
-    if (buf[i] != term[ti]) {
-      return 1;
-    }
-  }
-  return 0;
-}
-
 /**
  * 
  * @param timeout
  * @return 0 if newline seen, 1 if buffer overflowed, 2 if timed out
  */
-int get_data(int timeout, UART_MODULE m, char* term, int echo) {
+int get_data(int timeout, UART_MODULE m, char* term, int echo, char* ret_buf, int* len) {
   static int start_time;
   start_time = time_tick_millsec;
   
   int term_len = strlen(term);
-  
-  buf_ptr = 0;
+  int buf_len = *len;
+  *len = 0;
   while(1) {
     if(UARTReceivedDataIsAvailable(m)) {
       // reset timeout when we get a character
@@ -52,7 +42,7 @@ int get_data(int timeout, UART_MODULE m, char* term, int echo) {
       // read the character
       char character = UARTGetDataByte(m);
       // put it in the buffer
-      read_buffer[buf_ptr++] = character;
+      ret_buf[(*len)++] = character;
       
       if (echo == 1) {
         // echo the character to the screen
@@ -60,17 +50,17 @@ int get_data(int timeout, UART_MODULE m, char* term, int echo) {
       }
       
       // check for termination
-      if (ends_with(read_buffer, buf_ptr, term, term_len) == 0) {
+      if (ends_with(ret_buf, *len, term, term_len) == 0) {
         if (echo == 1 && m == UART_COMP) {
           send_byte('\n', m);
         }
-        read_buffer[buf_ptr] = '\0';
+        ret_buf[*len] = '\0';
         return 0;
       }
       
       // check for termination
-      if (buf_ptr == BUFFER_SIZE-1) {
-        read_buffer[buf_ptr] = '\0';
+      if (*len == buf_len-1) {
+        ret_buf[*len] = '\0';
         return 1;
       }
     }
@@ -80,13 +70,13 @@ int get_data(int timeout, UART_MODULE m, char* term, int echo) {
   }
 }
 
-int get_data_dma(int timeout, char* term, int echo) {
+int get_data_dma(int timeout, char* term, int echo, char* ret_buf, int* len) {
   static int start_time;
   start_time = time_tick_millsec;
   
   int term_len = strlen(term);
-  
-  buf_ptr = 0;
+  int buf_len = *len;
+  *len = 0;
   while(1) {
     if (write_head != read_head) {
       // reset timeout when we get a character
@@ -97,7 +87,7 @@ int get_data_dma(int timeout, char* term, int echo) {
       read_head = read_head % DMA_BUFFER_SIZE;
       
       // put it in the buffer
-      read_buffer[buf_ptr++] = character;
+      ret_buf[(*len)++] = character;
       
       if (echo == 1) {
         // echo the character to the screen
@@ -105,17 +95,17 @@ int get_data_dma(int timeout, char* term, int echo) {
       }
       
       // check for termination
-      if (ends_with(read_buffer, buf_ptr, term, term_len) == 0) {
+      if (ends_with(ret_buf, *len, term, term_len) == 0) {
         if (echo == 1 && dma_uart_chnl == UART_COMP) {
           send_byte('\n', dma_uart_chnl);
         }
-        read_buffer[buf_ptr] = '\0';
+        ret_buf[*len] = '\0';
         return 0;
       }
       
       // check for termination
-      if (buf_ptr == BUFFER_SIZE-1) {
-        read_buffer[buf_ptr] = '\0';
+      if (*len == buf_len-1) {
+        ret_buf[*len] = '\0';
         return 1;
       }
     }
@@ -152,7 +142,7 @@ void init_uart() {
 
   UARTConfigure(UART2, UART_ENABLE_PINS_TX_RX_ONLY);
   UARTSetLineControl(UART2, UART_DATA_SIZE_8_BITS | UART_PARITY_NONE | UART_STOP_BITS_1);
-//  UARTSetDataRate(UART2, pb_clock, COMP_BAUDRATE);
+  UARTSetDataRate(UART2, pb_clock, COMP_BAUDRATE);
   UARTEnable(UART2, UART_ENABLE_FLAGS(UART_PERIPHERAL | UART_RX | UART_TX));
   
   // === init the uart1 for ESP ===================
@@ -162,7 +152,7 @@ void init_uart() {
  
   UARTConfigure(UART1, UART_ENABLE_PINS_TX_RX_ONLY);
   UARTSetLineControl(UART1, UART_DATA_SIZE_8_BITS | UART_PARITY_NONE | UART_STOP_BITS_1);
-//  UARTSetDataRate(UART1, pb_clock, ESP_BAUDRATE);
+  UARTSetDataRate(UART1, pb_clock, ESP_BAUDRATE);
   UARTEnable(UART1, UART_ENABLE_FLAGS(UART_PERIPHERAL | UART_RX | UART_TX));
   
   // ===Set up DMA for receiving from comp ======================

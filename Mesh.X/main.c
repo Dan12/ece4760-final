@@ -19,12 +19,15 @@
 #include <stdio.h>
 
 #include "config.h"
-
 #include "system.h"
-
 #include "uart.h"
+#include "string_util.h"
 
 #define DEVICE_ID 1
+
+#define BUFFER_SIZE 1024
+static char read_buffer[BUFFER_SIZE];
+static int buf_ptr = 0;
 
 void echo_byte_buff() {
   static int i;
@@ -46,9 +49,29 @@ void echo_buff() {
 
 #define SEND_CMD_OK_AND_ECHO(cmd) \
 send_cmd(cmd, UART_ESP); \
-most_recent_result = get_data_dma(DEFAULT_TIMEOUT, "OK\r\n", 0); \
+buf_ptr = BUFFER_SIZE; \
+most_recent_result = get_data_dma(DEFAULT_TIMEOUT, "OK\r\n", 0, read_buffer, &buf_ptr); \
 echo_buff(); \
 if (most_recent_result != 0) return 1;
+
+static char cmd_buf[256];
+
+int send_data(char* data) {
+  int len = strlen(data);
+  sprintf(cmd_buf, "AT+CIPSEND=1,%d", len);
+  SEND_CMD_OK_AND_ECHO(cmd_buf);
+  
+  while(*data != NULL) {
+    send_byte(*(data++), UART_ESP);
+  }
+  
+  buf_ptr = BUFFER_SIZE;
+  most_recent_result = get_data_dma(DEFAULT_TIMEOUT, "OK\r\n", 0, read_buffer, &buf_ptr);
+  echo_buff();
+  if (most_recent_result != 0) return 1;
+  
+  return 0;
+}
 
 int setup() {
   send_cmd("Initiating connection", UART_COMP);
@@ -64,7 +87,6 @@ int setup() {
   SEND_CMD_OK_AND_ECHO("AT+CWMODE=3");
   
   // set name (ssid), password, channel, enc
-  static char cmd_buf[256];
   sprintf(cmd_buf, "AT+CWSAP_CUR=\"ESP8266-%d\",\"1234567890\",5,3", DEVICE_ID);
   SEND_CMD_OK_AND_ECHO(cmd_buf);
   
@@ -80,6 +102,27 @@ int setup() {
   
   // get local ip
   SEND_CMD_OK_AND_ECHO("AT+CIFSR");
+  
+  return 0;
+}
+
+int make_connection(char* ssid) {
+  sprintf(cmd_buf, "AT+CWJAP_CUR=\"%s\",\"1234567890\"", ssid);
+  SEND_CMD_OK_AND_ECHO(cmd_buf);
+  
+  SEND_CMD_OK_AND_ECHO("AT+CIPMUX=1");
+  
+  char* tmp = strtok(ssid, "-");
+  tmp = strtok(NULL, "-");
+  if (tmp != NULL) {
+    sprintf(cmd_buf, "AT+CIPSTART=1,\"TCP\",\"192.168.%s.1\",80", tmp);
+    SEND_CMD_OK_AND_ECHO(cmd_buf);
+    
+    send_data("Hello from the other side\n");
+    send_data("Whats up\n");
+  } else {
+    return 1;
+  }
   
   return 0;
 }
@@ -102,26 +145,36 @@ int main(void) {
   
   // scan on channel 5
   send_cmd("AT+CWLAP", UART_ESP);
-  most_recent_result = get_data_dma(DEFAULT_TIMEOUT, "OK\r\n", 0);
+  buf_ptr = BUFFER_SIZE;
+  most_recent_result = get_data_dma(DEFAULT_TIMEOUT, "OK\r\n", 0, read_buffer, &buf_ptr);
   echo_buff();
   
-  // tmp = "AT"
   char* tmp = strtok(read_buffer, "+CWLAP");
-  // tmp = \r\n
-  tmp = strtok(NULL, "+CWLAP");
-  // tmp = :(0,
-  tmp = strtok(NULL, "\"");
-  // tmp = SSID1
-  tmp = strtok(NULL, "\"");
-  send_cmd(tmp, UART_COMP);
-  // tmp = :(0,"SSID2",...)
   tmp = strtok(NULL, "+CWLAP");
   tmp = strtok(NULL, "\"");
   tmp = strtok(NULL, "\"");
-  send_cmd(tmp, UART_COMP);
+  while(tmp != NULL) {
+    send_cmd(tmp, UART_COMP);
+    if (starts_with(tmp, strlen(tmp), "ESP8266", 7) == 0) {
+      break;
+    }
+    tmp = strtok(NULL, "+CWLAP");
+    tmp = strtok(NULL, "\"");
+    tmp = strtok(NULL, "\"");
+  }
+  
+  if (tmp != NULL) {
+    if (make_connection(tmp) == 0) {
+      send_cmd("Made connection", UART_COMP); 
+    } else {
+      send_cmd("Connection failed", UART_COMP); 
+    }
+  }
   
   while(1) {
-    // TODO
+    // constant read loop
+    most_recent_result = get_data_dma(DEFAULT_TIMEOUT, "\r\n", 0, read_buffer, &buf_ptr);
+    echo_buff();
   }
 }
 
