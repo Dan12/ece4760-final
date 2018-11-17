@@ -46,6 +46,7 @@ class WifiModule(threading.Thread):
 
 	def send_data_to_mac(self, mac, data):
 		linkId = self.mac_to_linkId(mac)
+		# TODO handle no link ID
 		self.write_data(linkId, data)
 
 	def get_direct_macs(self):
