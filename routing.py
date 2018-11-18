@@ -50,13 +50,19 @@ class RoutingLayer:
         elif packets[0] == "E":
             self.on_receive_error(prev_mac, packets[1], packets[2])
 
-        self.wifi.prt("routes after proc: {}".format(self.routes))
+        # self.wifi.prt("routes after proc: {}".format(self.routes))
 
     def get_direct_conns(self):
         return self.wifi.get_direct_macs()
 
     def send_data(self, dest_mac, msg):
-        return self.wifi.send_data_to_mac(dest_mac, msg)
+        data_succ = self.wifi.send_data_to_mac(dest_mac, msg)
+        if data_succ:
+            return True
+
+        # invalidate route to dest
+        self.invalidate_table(dest_mac)        
+        return False
 
     def get_broadcast_id(self, mac):
         if mac in self.routes:
@@ -84,12 +90,15 @@ class RoutingLayer:
             if self.routes[mac][1] > hop_count:
                 self.routes[mac] = (next_hop, hop_count, self.routes[mac][2])
 
-    # if the mac we are trying to invalidate has the next hop equal to the
-    # mac we got the error from, delete that table entry
-    def invalidate_table(self, mac, prev_mac):
-        if self.routes[mac]:
-            if self.routes[mac][0] == prev_mac:
-                del self.routes[mac]
+    # delete the table entry and all entries associated with it
+    def invalidate_table(self, mac):
+        if mac in self.routes:
+            del self.routes[mac]
+            # also remove all entries where the next hop is the node we removed
+            for m in list(self.routes.keys()):
+                if self.get_next_hop(m) == mac:
+                    del self.routes[m]
+
 
     def get_next_hop(self, dest_mac):
         if dest_mac in self.routes:
@@ -108,14 +117,18 @@ class RoutingLayer:
         self.update_table(orig_mac, prev_mac, hop_count)
         # check if this is a duplicate rreq
         if not self.is_duplicate_packet(orig_mac, broadcast_id):
-            if dest_mac in self.routes:
-                next_hop = self.get_next_hop(orig_mac)
-                # TODO if no next hop, drop packet
-                self.send_rrep(next_hop, orig_mac, dest_mac, self.get_hop_count(dest_mac))
-            elif self.mac == dest_mac:
+            if self.mac == dest_mac:
+                # invalidate entry to orig (why else would orig send rreq)
+                self.invalidate_table(orig_mac)
+                # re-update the reverse route to the orig
+                self.update_table(orig_mac, prev_mac, hop_count)
                 next_hop = self.get_next_hop(orig_mac)
                 # TODO if no next hop, drop packet
                 self.send_rrep(next_hop, orig_mac, dest_mac, 0)
+            elif dest_mac in self.routes:
+                next_hop = self.get_next_hop(orig_mac)
+                # TODO if no next hop, drop packet
+                self.send_rrep(next_hop, orig_mac, dest_mac, self.get_hop_count(dest_mac))
             else:
                 for dir_mac in self.get_direct_conns():
                     if dir_mac != prev_mac:
@@ -178,7 +191,7 @@ class RoutingLayer:
     def on_receive_error(self, prev_mac, orig_mac, dest_mac):
         # invalidate route to destination if we route to the destination
         # from the previous mac
-        self.invalidate_table(dest_mac, prev_mac)
+        self.invalidate_table(dest_mac)
         # try to find a route back to the orig
         next_hop = self.get_next_hop(orig_mac)
         if next_hop:
