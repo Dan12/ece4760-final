@@ -1,38 +1,55 @@
 from collections import namedtuple
 
+class RouteTableEntry(namedtuple("RouteTableEntry", ["dst_mac", "dst_seq_num", "v_dst_seq_num", "state", "hop_count", "next_hop"])):
+    __slots__ = ()
+    def __str__(self):
+        pass
 
+class RREQMessage(namedtuple("RREQMessage", ["hop_count", "rreq_id", "dst_mac", "dst_seq_num", "u_dst_seq_num", "orig_mac", "orig_seq_num"])):
+    __slots__ = ()
+    def __str__(self):
+        "{},{},{},{},{},{},{}".format(self.hop_count, self.rreq_id, self.dst_mac, self.dst_seq_num, self.u_dst_seq_num, self.orig_mac, self.orig_seq_num)
+
+class RREPMessage(namedtuple("RREPMessage", ["hop_count", "dst_mac", "dst_seq_num", "orig_mac"])):
+    __slots__ = ()
+    def __str__(self):
+        "{},{},{},{}".format(self.hop_count, self.dst_mac, self.dst_seq_num, self.orig_mac)
 
 class RoutingLayer:
     def __init__(self, wifi):
-        # mapping from MAC addresses to (next hop, hop count, msg_id)
-        self.routes = {}
-        self.msg_id = 1
+        # mapping from MAC addresses to route table entry
+        self.route_table = {}
+        # mapping from orig MAC addresses to highest rreq id seen for that address
+        self.rreq_id_table = {}
+        self.rreq_id = 1
+        self.seq_num = 1
         self.mac = wifi.mac
         self.enqued_msg = None
         self.wifi = wifi
-        # set up trivial route to myself
-        self.routes[self.mac] = (self.mac, 0, 0)
+
+    def update_table_entry(self, entry_mac, )
 
     # 0 -> sent message
     # 1 -> message enqueued, wait until done
     # 2 -> no route yet, sending rreq and enqueued message
     def create_msg(self, dest_mac, msg):
         # cant send a message while enqued
-        if self.enqued_msg:
-            return 1
+        # if self.enqued_msg:
+        #     return 1
 
-        next_hop = self.get_next_hop(dest_mac)
-        if next_hop:
-            if self.send_msg(next_hop, self.mac, dest_mac, 0, msg):
-                return 0
+        # next_hop = self.get_next_hop(dest_mac)
+        # if next_hop:
+        #     if self.send_msg(next_hop, self.mac, dest_mac, 0, msg):
+        #         return 0
 
-        # if sending message failed, send rreq for dest
-        self.enqued_msg = (dest_mac, msg)
-        for dir_mac in self.get_direct_conns():
-            self.send_rreq(dir_mac, self.mac, dest_mac, 0, self.msg_id)
-        # incement broadcast ID
-        self.msg_id += 1
-        return 2
+        # # if sending message failed, send rreq for dest
+        # self.enqued_msg = (dest_mac, msg)
+        # for dir_mac in self.get_direct_conns():
+        #     self.send_rreq(dir_mac, self.mac, dest_mac, 0, self.msg_id)
+        # # incement broadcast ID
+        # self.msg_id += 1
+        # return 2
+        pass
 
     def handle_recv_msg(self, src_mac, msg):
         self.wifi.prt("msg from {}: {}".format(src_mac, msg))
@@ -45,157 +62,72 @@ class RoutingLayer:
         if data_succ:
             return True
 
-        # invalidate route to dest
-        self.invalidate_table(dest_mac)        
+        # TODO invalidate route to dest?
+        # self.invalidate_table(dest_mac)        
         return False
 
-    def get_msg_id(self, mac):
-        if mac in self.routes:
-            return self.routes[mac][2]
+    def create_rreq(self, dst_mac):
+        self.rreq_id += 1
+        self.seq_num += 1
+        rreq_msg = RREQMessage(
+            hop_count=0, 
+            rreq_id=self.rreq_id, 
+            dst_mac=dst_mac, 
+            dst_seq_num=0, 
+            u_dst_seq_num=0, 
+            orig_mac=self.mac, 
+            orig_seq_num=self.seq_num)
+        if dst_mac in self.route_table:
+            # old but invalid seq number
+            rreq_msg.dst_seq_num = self.route_table[dst_mac].dst_seq_num
         else:
-            return 0
+            # set unknown seq number to 1 (true)
+            rreq_msg.u_dst_seq_num = 1
 
-	# check if duplicate broadcast id and update msg_id if not
-    def is_duplicate_packet(self, mac, msg_id):
-        if mac not in self.routes:
-            # Never seen before, so not dup
-            return False
-        if self.routes[mac][2] < msg_id:
-            # most recent broadcast id is less than current, not dup
-            self.routes[mac] = (self.routes[mac][0], self.routes[mac][1], msg_id)
-            return False
-        else:
-            return True
-
-    def update_table(self, mac, next_hop, hop_count, msg_id=0):
-        if mac not in self.routes:
-            self.routes[mac] = (next_hop, hop_count, msg_id)
-        else:
-            # if we have a better path, set it to that (maintain msg_id)
-            if self.routes[mac][1] > hop_count:
-                self.routes[mac] = (next_hop, hop_count, self.routes[mac][2] if self.routes[mac][2] > msg_id else msg_id)
-
-    # delete the table entry and all entries associated with it
-    def invalidate_table(self, mac):
-        if mac in self.routes:
-            del self.routes[mac]
-            # also remove all entries where the next hop is the node we removed
-            for m in list(self.routes.keys()):
-                if self.get_next_hop(m) == mac:
-                    del self.routes[m]
-
-
-    def get_next_hop(self, dest_mac):
-        if dest_mac in self.routes:
-            return self.routes[dest_mac][0]
-        return None
-
-    def get_hop_count(self, dest_mac):
-        if dest_mac in self.routes:
-            return self.routes[dest_mac][1]
-        return 0
+        for dir_mac in self.get_direct_conns():
+            # send the rreq to all neighbors
+            self.send_rreq(rreq_msg)
 
     def process_data(self, prev_mac, packets):
-        # update table for reverse route
-        self.update_table(prev_mac, prev_mac, 1)
-
         # DYNAMIC ROUTE DISCOVERY
-        # Flood packet (RREQ) of form F,orig,dest,hop_cnt,id
+        # Flood packet (RREQ)
         if packets[0] == "F":
-            self.on_receive_rreq(prev_mac, packets[1], packets[2], int(packets[3]), int(packets[4]))
-        # Flood receive packet (RREP) of form FR,orig,dest,hop_cnt
+            rreq_msg = RREQMessage(
+                hop_count=int(packets[1]), 
+                rreq_id=int(packets[2]),
+                dst_mac=packets[6],
+                dst_seq_num=int(packets[4]),
+                u_dst_seq_num=int(packets[5]),
+                orig_mac=packets[6], 
+                orig_seq_num=int(packets[7]))
+            self.on_receive_rreq(prev_mac, rreq_msg)
+        # Flood receive packet (RREP)
         elif packets[0] == "FR":
             self.on_receive_rrep(prev_mac, packets[1], packets[2], int(packets[3]))
         # Message packet (src,dest,hop_count,msg_id,data)
         elif packets[0] == "M":
-            self.on_receive_msg(prev_mac, packets[1], packets[2], int(packets[3]), int(packets[4]), packets[5])
+            pass
+            # self.on_receive_msg(prev_mac, packets[1], packets[2], int(packets[3]), int(packets[4]), packets[5])
         # Message Error (E,orig,dst)
         elif packets[0] == "E":
-            self.on_receive_error(prev_mac, packets[1], packets[2])
+            pass
+            # self.on_receive_error(prev_mac, packets[1], packets[2])
 
         self.wifi.prt("routes after proc: {}".format(self.routes))
 
-    def on_receive_rreq(self, prev_mac, orig_mac, dest_mac, hop_count, msg_id):
-        # update hop count
-        hop_count+=1
-        # update the reverse route to the orig
-        self.update_table(orig_mac, prev_mac, hop_count, msg_id=msg_id)
-        # check if this is a duplicate rreq
-        if not self.is_duplicate_packet(orig_mac, msg_id):
-            if self.mac == dest_mac:
-                # invalidate entry to orig (why else would orig send rreq)
-                self.invalidate_table(orig_mac)
-                # re-update the reverse route to the orig
-                self.update_table(orig_mac, prev_mac, hop_count, msg_id=msg_id)
-                next_hop = self.get_next_hop(orig_mac)
-                # TODO if no next hop, drop packet
-                self.send_rrep(next_hop, orig_mac, dest_mac, 0)
-            elif dest_mac in self.routes:
-                next_hop = self.get_next_hop(orig_mac)
-                # TODO if no next hop, drop packet
-                self.send_rrep(next_hop, orig_mac, dest_mac, self.get_hop_count(dest_mac))
-            else:
-                for dir_mac in self.get_direct_conns():
-                    if dir_mac != prev_mac:
-                        self.send_rreq(dir_mac, orig_mac, dest_mac, hop_count, msg_id)
+    def on_receive_rreq(self, prev_mac, rreq_msg):
+        # update table for reverse route
+        self.update_table(prev_mac, prev_mac, 1)
 
     def on_receive_rrep(self, prev_mac, orig_mac, dest_mac, hop_count):
-        # update the hop count
-        hop_count+=1
-        # update the table entry to the destination
-        self.update_table(dest_mac, prev_mac, hop_count)
-        if orig_mac == self.mac:
-            # try and resend enqueued messaged
-            if self.enqued_msg:
-                if dest_mac == self.enqued_msg[0]:
-                    next_hop = self.get_next_hop(self.enqued_msg[0])
-                    if next_hop:
-                        # send the enqueued message
-                        self.send_msg(next_hop, self.mac, self.enqued_msg[0], 0, self.enqued_msg[1])
-                    self.enqued_msg = None
-        else:
-            # get the next hop on the reverse route
-            next_hop = self.get_next_hop(orig_mac)
-            # TODO if no next hop, drop packet
-            # send the rrep along that route
-            self.send_rrep(next_hop, orig_mac, dest_mac, self.get_hop_count(dest_mac))
+        pass
 
     def on_receive_msg(self, prev_mac, orig_mac, dest_mac, hop_count, msg_id, msg):
-        if self.is_duplicate_packet(orig_mac, msg_id):
-            # we have a loop
-            # invalidate route and send error packet
-            self.invalidate_table(dest_mac)
-            # TODO add loop detection for rrep and error
-            self.send_error(prev_mac, orig_mac, dest_mac)
-        else:
-            # update hop count
-            hop_count+=1
-            # update reverse path
-            self.update_table(orig_mac, prev_mac, hop_count, msg_id=msg_id)
-            if dest_mac == self.mac:
-                # we are the destination, handle the message
-                self.handle_recv_msg(orig_mac, msg)
-            else:
-                next_hop = self.get_next_hop(dest_mac)
-                if next_hop:
-                    if self.send_msg(next_hop, orig_mac, dest_mac, hop_count, msg):
-                        return
-                
-                # If no success, send error back
-                next_hop = self.get_next_hop(orig_mac)
-                # drop packet if we disconnected from prev
-                if next_hop:
-                    self.send_error(next_hop, orig_mac, dest_mac)
+        pass    
 
     # handle error from sending message from
     def on_receive_error(self, prev_mac, orig_mac, dest_mac):
-        # invalidate route to destination if we route to the destination
-        # from the previous mac
-        self.invalidate_table(dest_mac)
-        # try to find a route back to the orig
-        next_hop = self.get_next_hop(orig_mac)
-        if next_hop:
-            self.send_error(next_hop, orig_mac, dest_mac)
+        pass        
 
     def send_rreq(self, next_mac, orig_mac, dest_mac, hop_count, msg_id):
         return self.send_data(next_mac, "F,{},{},{},{}".format(orig_mac, dest_mac, hop_count, msg_id))
@@ -204,9 +136,11 @@ class RoutingLayer:
         return self.send_data(next_mac, "FR,{},{},{}".format(orig_mac, dest_mac, hop_count))
 
     def send_msg(self, next_mac, orig_mac, dest_mac, hop_count, msg):
-        mid = self.msg_id
-        self.msg_id += 1
-        return self.send_data(next_mac, "M,{},{},{},{},{}".format(orig_mac, dest_mac, hop_count, mid, msg))
+        pass
+        # mid = self.msg_id
+        # self.msg_id += 1
+        # return self.send_data(next_mac, "M,{},{},{},{},{}".format(orig_mac, dest_mac, hop_count, mid, msg))
 
     def send_error(self, next_mac, orig_mac, dest_mac):
-        return self.send_data(next_mac, "E,{},{}".format(orig_mac, dest_mac))
+        pass
+        # return self.send_data(next_mac, "E,{},{}".format(orig_mac, dest_mac))
