@@ -91,5 +91,10 @@ remove_connection(m2, m3)
 # now the path to 4 is through 2->5->6->4
 m1.Router.create_msg(m4.mac, "Hi again")
 simualte()
-m1.Router.create_msg(m4.mac, "Hi again")
-simualte()
+# get message sending error
+# just timeout, invalidate route, and send again
+# m1.Router.invalidate_table(m4.mac)
+# m1.Router.create_msg(m4.mac, "Hi again")
+# simualte()
+# m3.Router.create_msg(m1.mac, "Hi from 3")
+# simualte()
