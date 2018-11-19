@@ -3,6 +3,10 @@ from recordclass import recordclass
 
 GraphEntry = recordclass("GraphEntry", "seq_num adj_node_dict")
 
+# should be max connections/max connections-1
+# controls how well the reverse edge algorithm works
+SPARSITY = 3
+
 class Routing(RoutingAPI):
     def __init__(self, wifi):
         super(Routing, self).__init__(wifi)
@@ -20,6 +24,30 @@ class Routing(RoutingAPI):
             if self.graph[mac].adj_node_dict[entry] == 0:
                 in_degree += 1
         return in_degree
+
+    def has_conntype_1(self, mac):
+        for entry in self.graph[mac].adj_node_dict:
+            if self.graph[mac].adj_node_dict[entry] == 1:
+                return True
+        return False
+
+    # find closest node without a 1 connection
+    def find_reversable_path(self):
+        # tuple of (node,path)
+        queue = []
+        visited = {}
+        queue.append((self.mac, [self.mac]))
+        visited[self.mac] = True
+
+        while queue:
+            (node, path) = queue.pop(0)
+            if not self.has_conntype_1(node):
+                return path
+            for mac in self.graph[node].adj_node_dict:
+                if mac in self.graph and mac not in visited:
+                    queue.append((mac, path+[mac]))
+                    visited[mac] = True
+        return None
 
     def tick_topology_algo(self):
         vis_macs = self.wifi.get_visible_macs()
@@ -40,27 +68,7 @@ class Routing(RoutingAPI):
         
         # topology algorithms
 
-        # sparse connection algorithm
-        # if I see a AP in the mesh with an in degree at least 2 smaller than
-        # the AP I am connected to disconnect from current AP and connect to other AP
-        if self.wifi.get_connected_ap() and self.wifi.get_connected_ap() in self.graph:
-            # self.wifi.prt("graph after proc: {}".format(self.graph))
-            cur_ap_in_degree = self.get_node_in_degree(self.wifi.get_connected_ap())
-
-            min_in_degree = cur_ap_in_degree
-            min_in_degree_mac = None
-            for node in self.graph:
-                if self.get_node_in_degree(node) < min_in_degree:
-                    min_in_degree = self.get_node_in_degree(node)
-                    min_in_degree_mac = node
-        
-            # threashold is 3
-            if min_in_degree <= cur_ap_in_degree-3:
-                # self.wifi.prt("Sparsifying graph from {} to {}".format(self.wifi.get_connected_ap(), min_in_degree_mac))
-                self.wifi.disconnect_from_ap()
-                self.wifi.connect_to_ap(min_in_degree_mac)
-
-        # reverse edge algorithm
+        # reverse edge algorithm (run before sparse connection since fully connected mesh is more important than sparsity)
         # only check for reverse edge if you are connected to an AP
         # see if there is a visible mac not in the mesh
         # try and find a reversable path in your mesh
@@ -75,15 +83,50 @@ class Routing(RoutingAPI):
                         max_mac = mac
                         max_stren = stren
             if max_mac:
-                self.wifi.prt("Must reverse edge")
+                path = self.find_reversable_path()
+                # self.wifi.prt(path)
+                # send reverse edge
+                self.send_reverse_edge(path)
+                self.wifi.disconnect_from_ap()
+                self.wifi.connect_to_ap(max_mac)
+
+        # sparse connection algorithm
+        # if I see a AP in the mesh with an in degree at least 2 smaller than
+        # the AP I am connected to disconnect from current AP and connect to other AP
+        if self.wifi.get_connected_ap() and self.wifi.get_connected_ap() in self.graph:
+            # self.wifi.prt("graph after proc: {}".format(self.graph))
+            cur_ap_in_degree = self.get_node_in_degree(self.wifi.get_connected_ap())
+
+            min_in_degree = cur_ap_in_degree
+            min_in_degree_mac = None
+            for node in self.graph:
+                if self.get_node_in_degree(node) < min_in_degree:
+                    min_in_degree = self.get_node_in_degree(node)
+                    min_in_degree_mac = node
+        
+            # threashold is SPARSITY
+            if min_in_degree <= cur_ap_in_degree-SPARSITY:
+                # self.wifi.prt("Sparsifying graph from {} to {}".format(self.wifi.get_connected_ap(), min_in_degree_mac))
+                self.wifi.disconnect_from_ap()
+                self.wifi.connect_to_ap(min_in_degree_mac)
+
+        # no cycle algorithm
+        # if there is a cycle in the graph have the STA with the smallest mac
+        # disconnect from the AP
+        # TODO
+
+        # no duplicate connection algorithm
+        # if we are connected to an ap that is also directly connected to us
+        # disconnect if we have the lower mac
+        # TODO
 
     # called when a station disconnects from my access point
-    def sta_disconnected(self, sta_mac):
+    def mac_disconnected(self, mac):
         self.seq_num += 1
         # remove edge
-        self.remove_edge(self.mac, sta_mac)
+        self.remove_edge(self.mac, mac)
         # send flood to network
-        self.send_flood(None, self.mac, self.seq_num, 1, self.mac, sta_mac)
+        self.send_flood(None, self.mac, self.seq_num, 1, self.mac, mac)
 
     # called when a station connects to my access point
     def sta_connected(self, sta_mac):
@@ -92,8 +135,8 @@ class Routing(RoutingAPI):
         # send bootstrap message
         self.send_bootstrap(sta_mac)
         # send flood to network
-        self.seq_num += 1
-        self.send_flood(None, self.mac, self.seq_num, 0, self.mac, sta_mac)
+        # self.seq_num += 1
+        # self.send_flood(None, self.mac, self.seq_num, 0, self.mac, sta_mac)
 
     # return all the nodes that this node knows of in the mesh
     def get_nodes(self):
@@ -120,7 +163,10 @@ class Routing(RoutingAPI):
             self.on_receive_d(prev_mac, packets[1], int(packets[2]), packets[3], packets[4])
         # Bootstrap packet (get graph)
         elif packets[0] == "B":
-            self.on_receive_b(packets[1])
+            self.on_receive_b(prev_mac, packets[1])
+        # Reverse edge
+        elif packets[0] == "R":
+            self.on_receive_reverse_edge(packets[1])
 
         # self.wifi.prt("graph after proc: {}".format(self.graph))
 
@@ -138,15 +184,38 @@ class Routing(RoutingAPI):
         self.graph[mac_ap].adj_node_dict[mac_sta] = 0
         self.graph[mac_sta].adj_node_dict[mac_ap] = 1
 
-    def remove_edge(self, mac_ap, mac_sta):
-        # remove sta from ap node
-        if mac_ap in self.graph and mac_sta in self.graph[mac_ap].adj_node_dict:
-            del self.graph[mac_ap].adj_node_dict[mac_sta]
-        # remove ap from sta node
-        if mac_sta in self.graph and mac_ap in self.graph[mac_sta].adj_node_dict:
-            del self.graph[mac_sta].adj_node_dict[mac_ap]
+    def prune_graph(self):
+        disconnected_nodes = []
+        for node in self.graph:
+            disconnected_nodes.append(node)
 
-        # TODO prune graph if we now have 2 components
+        queue = []
+        visited = {}
+        queue.append(self.mac)
+        visited[self.mac] = True
+        while queue:
+            node = queue.pop(0)
+            disconnected_nodes.remove(node)
+            for mac in self.graph[node].adj_node_dict:
+                if mac in self.graph and mac not in visited:
+                    queue.append(mac)
+                    visited[mac] = True
+
+        for node in disconnected_nodes:
+            del self.graph[node]
+
+
+    def remove_edge(self, mac_1, mac_2):
+        # remove 2 from 1
+        if mac_1 in self.graph and mac_2 in self.graph[mac_1].adj_node_dict:
+            del self.graph[mac_1].adj_node_dict[mac_2]
+        # remove 1 from 2
+        if mac_2 in self.graph and mac_1 in self.graph[mac_2].adj_node_dict:
+            del self.graph[mac_2].adj_node_dict[mac_1]
+
+        # prune graph if we now have 2 components
+        self.prune_graph()
+
 
     def is_valid_seq_num(self, mac, seq_num):
         if mac in self.graph:
@@ -178,7 +247,18 @@ class Routing(RoutingAPI):
                     visited[mac] = True
         return None
 
-    def on_receive_b(self, data):
+    # return all edges with conn_type == 0
+    def get_ap_connections(self):
+        conns = []
+        for node in self.graph:
+            for entry in self.graph[node].adj_node_dict:
+                if self.graph[node].adj_node_dict[entry] == 0:
+                    conns.append((node, entry))
+
+        return conns
+
+
+    def on_receive_b(self, prev_mac, data):
         # bootstrap packets are as follows "from_mac|seq_num|to_mac1|conn_type1|...|\nfrom_mac"
         nodes = data.split("\n")
         for n in nodes:
@@ -188,11 +268,18 @@ class Routing(RoutingAPI):
                 from_seq_num = node_data[1]
                 for i in range(2,len(node_data)-1,2):
                     to_mac = node_data[i]
-                    conn_type = node_data[i+1]
+                    conn_type = int(node_data[i+1])
+                    # avoid duplicates by only adding conn_type 0
                     if conn_type == 0:
                         self.add_edge(from_mac, to_mac)
-                    else:
-                        self.add_edge(to_mac, from_mac)
+
+        # send flood messages of edges not known to either component
+        known_connections = self.get_ap_connections()
+        # self.wifi.prt(known_connections)
+        # flood connections
+        for (ap_mac, sta_mac) in known_connections:
+            self.seq_num += 1
+            self.send_flood(None, self.mac, self.seq_num, 0, ap_mac, sta_mac)
 
     def on_receive_d(self, prev_mac, orig_mac, orig_seq_num, dest_mac, msg):
         if self.is_valid_seq_num(orig_mac, orig_seq_num):
@@ -213,9 +300,27 @@ class Routing(RoutingAPI):
                 self.remove_edge(mac_1, mac_2)
             self.send_flood(prev_mac, orig_mac, orig_seq_num, f_type, mac_1, mac_2)
 
+    def on_receive_reverse_edge(self, data):
+        path = data.split("|")
+        # self.wifi.prt("recved rev edge: {}".format(path))
+        if path[1] == self.mac:
+            rev_ap = path[0]
+            path.pop(0)
+            # send reverse if not last node
+            if len(path) > 1:
+                self.send_reverse_edge(path)
+                # only need to disconnect if not last node
+                self.wifi.disconnect_from_ap()
+            
+            # connect to new ap
+            self.wifi.connect_to_ap(rev_ap)
+
+
     # dest should be a neighbor
     def send_data(self, dest_mac, msg):
-        self.wifi.send_data(dest_mac, msg)
+        if not self.wifi.send_data(dest_mac, msg):
+            # if send fails, flood network with broken edge from self to dest
+            self.mac_disconnected(dest_mac)
 
     def send_bootstrap(self, bootstrap_mac):
         payload = ""
@@ -234,3 +339,8 @@ class Routing(RoutingAPI):
         for neighbor_mac in self.get_direct_conns():
             if neighbor_mac != prev_mac:
                 self.send_data(neighbor_mac, "F,{},{},{},{},{}".format(orig_mac, orig_seq_num, f_type, mac_1, mac_2))
+
+    def send_reverse_edge(self, path):
+        payload = "|".join(path)
+        dest = path[1]
+        self.send_data(dest, "R,{}".format(payload))

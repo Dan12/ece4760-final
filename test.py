@@ -17,6 +17,17 @@ class App():
         other.r.tick_topology_algo()
         WifiSim.simulate()
 
+    def take_out_of_range(self, other):
+        self.w.remove_visible_mac(other.mac)
+        other.w.remove_visible_mac(self.mac)
+        self.w.mac_disconnected(other.mac)
+        other.w.mac_disconnected(self.mac)
+
+        self.r.tick_topology_algo()
+        WifiSim.simulate()
+        other.r.tick_topology_algo()
+        WifiSim.simulate()
+
     def send_message(self, mac, msg):
         self.r.send_message(mac, msg)
         WifiSim.simulate()
@@ -54,5 +65,7 @@ a1.send_message(a3.mac, "Hi to 3 from 1")
 a3.put_in_range(a2, 7)
 
 a1.send_message(a3.mac, "Hi to 3 from 1")
+a1.send_message(a4.mac, "Hi to 4 from 1")
 
-# a4.put_in_range(a2, 5)
+a3.take_out_of_range(a2)
+a1.send_message(a4.mac, "Hi to 4 from 1")

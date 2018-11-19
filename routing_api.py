@@ -9,7 +9,7 @@ class RoutingAPI(ABC):
         self.on_recv_msg_handler = None
 
         wifi.register_recv_handler(self.recv_message)
-        wifi.register_direct_disconnection_handler(self.sta_disconnected)
+        wifi.register_direct_disconnection_handler(self.mac_disconnected)
         wifi.register_ap_connection_handler(self.sta_connected)
 
     def register_recv_msg_handler(self, handler):
@@ -22,7 +22,7 @@ class RoutingAPI(ABC):
 
     # called when a station disconnects from my access point
     @abstractmethod
-    def sta_disconnected(self, sta_mac):
+    def mac_disconnected(self, mac):
         pass
 
     # called when a station connects to my access point

@@ -17,6 +17,7 @@ class WifiSim(WifiAPI):
 
         self.connected_ap = None
 
+        # list of tuples (mac, strength)
         self.visible_macs = []
 
         # queue of messages
@@ -36,13 +37,24 @@ class WifiSim(WifiAPI):
     def send_data(self, dest_mac, data):
         if dest_mac in self.direct_conns:
             self.direct_conns[dest_mac].queue_data(self.mac, data)
-            return
+            return True
+        return False
+
+    def is_visible(self, mac):
+        for (m, s) in self.visible_macs:
+            if m == mac:
+                return True
+
+        return False
 
     def connect_to_ap(self, ap_mac):
         if not self.connected_ap:
-            self.direct_conns[ap_mac] = WifiSim.Sims[ap_mac]
-            self.connected_ap = ap_mac
-            WifiSim.Sims[ap_mac].station_connection(self.mac)
+            if self.is_visible(ap_mac):
+                self.direct_conns[ap_mac] = WifiSim.Sims[ap_mac]
+                self.connected_ap = ap_mac
+                WifiSim.Sims[ap_mac].station_connection(self.mac)
+            else:
+                self.prt("Cant see {}".format(ap_mac))
 
     # called when a station connects to this AP
     def station_connection(self, sta_mac):
@@ -59,21 +71,30 @@ class WifiSim(WifiAPI):
             del self.direct_conns[self.connected_ap]
             mac_to_disconnect = self.connected_ap
             self.connected_ap = None
-            WifiSim.Sims[mac_to_disconnect].station_disconnected(self.mac)
+            WifiSim.Sims[mac_to_disconnect].mac_disconnected(self.mac)
 
     def get_connected_ap(self):
         return self.connected_ap
 
-    def station_disconnected(self, sta_mac):
-        del self.direct_conns[sta_mac]
+    def mac_disconnected(self, mac):
+        del self.direct_conns[mac]
         if self.on_direct_disconnection_handler:
-            self.on_direct_disconnection_handler(sta_mac)
+            self.on_direct_disconnection_handler(mac)
 
     def get_visible_macs(self):
         return self.visible_macs
 
     def add_visible_mac(self, mac, strength):
         self.visible_macs.append((mac, strength))
+
+    def remove_visible_mac(self, mac):
+        remove_idx = -1
+        for i, (vmac, s) in enumerate(self.visible_macs):
+            if vmac == mac:
+                remove_idx = i
+                break
+        if remove_idx != -1:
+            del self.visible_macs[remove_idx]
 
     @staticmethod
     def simulate():

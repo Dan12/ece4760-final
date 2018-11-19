@@ -21,6 +21,7 @@ class WifiAPI(ABC):
         self.on_ap_connection_handler = handler
 
     # send data to the mac address (must be valid neighbor)
+    # return True if success, False if failure
     @abstractmethod
     def send_data(self, dest_mac, data):
         pass
