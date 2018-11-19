@@ -25,11 +25,7 @@ class RoutingLayer:
 
     # dest should be a neighbor
     def send_data(self, dest_mac, msg):
-        data_succ = self.wifi.send_data_to_mac(dest_mac, msg)
-        if data_succ:
-            return True
-
-        return False
+        self.wifi.send_data_to_mac(dest_mac, msg)
 
     # called by wifi when a connection is made
     def made_ap_connection(self, sta_mac):

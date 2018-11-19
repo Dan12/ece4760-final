@@ -41,8 +41,9 @@ class TestWifi():
     def send_data_to_mac(self, dest_mac, msg):
         if dest_mac in self.direct_conns:
             self.direct_conns[dest_mac].queue_data(self.mac, msg)
-            return True
-        return False
+            return
+        # tell the router we no longer have a direct connection to this mac
+        self.Router.lost_connection(dest_mac)
 
     def prt(self, msg):
         print("{}: {}".format(self.mac, msg))
