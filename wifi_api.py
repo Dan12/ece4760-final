@@ -40,6 +40,10 @@ class WifiAPI(ABC):
     def disconnect_from_ap(self):
         pass
 
+    @abstractmethod
+    def get_connected_ap(self):
+        pass
+
     # returns tuples of (mac, strength)
     @abstractmethod
     def get_visible_macs(self):

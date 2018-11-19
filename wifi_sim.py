@@ -7,7 +7,7 @@ class WifiSim(WifiAPI):
     Sims = {}
 
     def __init__(self):
-        super(WifiSim, self).__init__(WifiSim.uuid)
+        super(WifiSim, self).__init__(str(WifiSim.uuid))
         WifiSim.uuid += 1
 
         # mapping from mac to WifiSim
@@ -22,16 +22,20 @@ class WifiSim(WifiAPI):
         # queue of messages
         self.data_queue = []
 
-    def handle_incoming_data(self, from_mac, msg):
+    def prt(self, msg):
+        print("{}: {}".format(self.mac, msg))
+
+    def handle_incoming_data(self, from_mac, data):
+        self.prt("from {} got: {}".format(from_mac, data))
         if self.on_recv_handler:
-            self.on_recv_handler(from_mac, msg)
+            self.on_recv_handler(from_mac, data)
 
     def queue_data(self, from_mac, data):
         self.data_queue.append((from_mac, data))
 
     def send_data(self, dest_mac, data):
         if dest_mac in self.direct_conns:
-            self.direct_conns[dest_mac].queue_data(self.mac, msg)
+            self.direct_conns[dest_mac].queue_data(self.mac, data)
             return
 
     def connect_to_ap(self, ap_mac):
@@ -57,6 +61,9 @@ class WifiSim(WifiAPI):
             self.connected_ap = None
             WifiSim.Sims[mac_to_disconnect].station_disconnected(self.mac)
 
+    def get_connected_ap(self):
+        return self.connected_ap
+
     def station_disconnected(self, sta_mac):
         del self.direct_conns[sta_mac]
         if self.on_direct_disconnection_handler:
@@ -78,6 +85,6 @@ class WifiSim(WifiAPI):
                     all_empty = False
                     while mod.data_queue:
                         data = mod.data_queue.pop(0)
-                        mod.handle_data(data[0], data[1])
+                        mod.handle_incoming_data(data[0], data[1])
             if all_empty:
                 break
