@@ -26,7 +26,7 @@ class WifiAPI(ABC):
     def send_data(self, dest_mac, data):
         pass
 
-    # send data to the mac address (must be valid neighbor)
+    # connect to an ap (must be valid neighbor)
     @abstractmethod
     def connect_to_ap(self, ap_mac):
         pass
