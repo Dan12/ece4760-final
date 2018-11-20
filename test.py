@@ -27,6 +27,8 @@ class App():
         other.w.add_visible_mac(self.mac, s)
         Topology.simulate()
         WifiSim.simulate()
+        Topology.simulate()
+        WifiSim.simulate()
 
     def take_out_of_range(self, other):
         pass
@@ -113,50 +115,43 @@ a4 = App()
 # a4.is_consistent_graph()
 # print(a1.r.get_graph())
 
-# Auto connection and no duplicate connections test
-a2.put_in_range(a1, 5)
-a3.put_in_range(a1, 7)
-a4.put_in_range(a1, 5)
+# Auto connection and Sparse connection test
+# a2.put_in_range(a1, 5)
+# a3.put_in_range(a1, 7)
+# a4.put_in_range(a1, 5)
 
-a4.put_in_range_seq(a2, 10)
+# a4.put_in_range_seq(a2, 10)
+
+# a1.is_consistent_graph()
+# a2.is_consistent_graph()
+# a3.is_consistent_graph()
+# a4.is_consistent_graph()
+# print(a1.r.get_graph())
+
+# a2.send_message(a1.mac, "Hi from 2")
+# a1.send_message(a2.mac, "Hi back from 1")
+# a1.send_message(a3.mac, "Hi to 3 from 1")
+# a4.send_message(a3.mac, "Hi to 3 from 4")
+
+
+# reverse edge test
+a2.put_in_range_seq(a1, 5)
+a3.put_in_range_seq(a4, 5)
+
+a2.send_message(a1.mac, "Hi from 2")
+a1.send_message(a2.mac, "Hi back from 1")
+a1.send_message(a3.mac, "Hi to 3 from 1")
+
+a3.put_in_range(a2, 7)
+
+a1.send_message(a3.mac, "Hi to 3 from 1")
+a1.send_message(a4.mac, "Hi to 4 from 1-1")
 
 a1.is_consistent_graph()
 a2.is_consistent_graph()
 a3.is_consistent_graph()
 a4.is_consistent_graph()
 print(a1.r.get_graph())
-
-a2.send_message(a1.mac, "Hi from 2")
-a1.send_message(a2.mac, "Hi back from 1")
-a1.send_message(a3.mac, "Hi to 3 from 1")
-a4.send_message(a3.mac, "Hi to 3 from 4")
-
-# Sparse connection test
-# a1.put_in_range(a2, 5)
-# a3.put_in_range(a2, 7)
-# a4.put_in_range(a2, 5)
-
-# a2.send_message(a1.mac, "Hi from 2")
-# a1.send_message(a2.mac, "Hi back from 1")
-# a1.send_message(a3.mac, "Hi to 3 from 1")
-# a4.send_message(a1.mac, "Hi to 1 from 4")
-
-# a4.put_in_range(a1, 10)
-
-# a4.send_message(a3.mac, "Hi to 3 from 4")
-
-# reverse edge test
-# a2.put_in_range(a1, 5)
-# a3.put_in_range(a4, 5)
-
-# a2.send_message(a1.mac, "Hi from 2")
-# a1.send_message(a2.mac, "Hi back from 1")
-# a1.send_message(a3.mac, "Hi to 3 from 1")
-
-# a3.put_in_range(a2, 7)
-
-# a1.send_message(a3.mac, "Hi to 3 from 1")
-# a1.send_message(a4.mac, "Hi to 4 from 1-1")
 
 # a3.take_out_of_range(a2)
 # a1.send_message(a4.mac, "Hi to 4 from 1-2")
