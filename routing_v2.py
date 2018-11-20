@@ -6,6 +6,9 @@ class Routing(RoutingAPI):
 
         self.seq_num = 1
 
+    def prt(self, msg):
+        print("Router {}: {}".format(self.mac, msg))
+
     # BEGIN WIFI PASSTHROUGH
     def connect_to_ap(self, ap_mac):
         self.wifi.connect_to_ap(ap_mac)
@@ -14,6 +17,7 @@ class Routing(RoutingAPI):
         self.wifi.get_direct_connections()
 
     def disconnect_from_ap(self):
+        self.mac_disconnected(self.get_connected_ap())
         self.wifi.disconnect_from_ap()
 
     def get_connected_ap(self):
@@ -25,11 +29,19 @@ class Routing(RoutingAPI):
 
     # called when a station disconnects from my access point
     def mac_disconnected(self, mac):
+        # Could be a duplicate connection disconnection
+        if mac not in self.get_direct_conns():
+            self.seq_num += 1
+            # remove edge
+            self.remove_edge(self.mac, mac)
+            # send flood to network
+            self.send_flood(None, self.mac, self.seq_num, 1, self.mac, mac)
+
+    # adds an edge to the graph
+    def add_graph_edge(self, ap_mac, sta_mac):
+        self.add_edge(ap_mac, sta_mac)
         self.seq_num += 1
-        # remove edge
-        self.remove_edge(self.mac, mac)
-        # send flood to network
-        self.send_flood(None, self.mac, self.seq_num, 1, self.mac, mac)
+        self.send_flood(None, self.mac, self.seq_num, 0, ap_mac, sta_mac)
 
     # called when a station connects to my access point
     def sta_connected(self, sta_mac):
@@ -47,10 +59,13 @@ class Routing(RoutingAPI):
 
     # if no path to dest_mac, drop packet
     def send_message(self, dest_mac, msg):
+        # self.prt("Sending to {}: {}".format(dest_mac, msg))
         next_hop = self.find_next_hop(dest_mac)
         if next_hop:
             self.seq_num += 1
             self.send_directed(next_hop, self.mac, self.seq_num, dest_mac, msg)
+        else:
+            self.prt("WARNING: no next hop found for {}".format(dest_mac))
 
     def recv_message(self, prev_mac, msg):
         packets = msg.split(",")
@@ -68,7 +83,7 @@ class Routing(RoutingAPI):
         elif packets[0] == "B":
             self.on_receive_b(prev_mac, packets[1])
 
-        # self.wifi.prt("graph after proc: {}".format(self.graph))
+        # self.prt("graph after proc: {}".format(self.graph))
 
     def get_direct_conns(self):
         return self.wifi.get_direct_connections()
@@ -172,9 +187,10 @@ class Routing(RoutingAPI):
                     if conn_type == 0:
                         self.add_edge(from_mac, to_mac)
 
+        # TODO smarter flood algorithm
         # send flood messages of edges not known to either component
         known_connections = self.get_ap_connections()
-        # self.wifi.prt(known_connections)
+        # self.prt(known_connections)
         # flood connections
         for (ap_mac, sta_mac) in known_connections:
             self.seq_num += 1

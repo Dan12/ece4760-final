@@ -18,13 +18,13 @@ class WifiSim(WifiAPI):
         self.connected_ap = None
 
         # list of tuples (mac, strength)
-        self.visible_macs = []
+        self.visible_macs = []x
 
         # queue of messages
         self.data_queue = []
 
     def prt(self, msg):
-        print("{}: {}".format(self.mac, msg))
+        print("Wifi {}: {}".format(self.mac, msg))
 
     def handle_incoming_data(self, from_mac, data):
         self.prt("from {} got: {}".format(from_mac, data))
@@ -32,11 +32,14 @@ class WifiSim(WifiAPI):
             self.on_recv_handler(from_mac, data)
 
     def queue_data(self, from_mac, data):
-        self.data_queue.append((from_mac, data))
+        self.data_queue.append((1, from_mac, data))
 
     def send_data(self, dest_mac, data):
         if dest_mac in self.direct_conns:
             self.direct_conns[dest_mac].queue_data(self.mac, data)
+            return True
+        elif dest_mac == self.connected_ap:
+            WifiSim.Sims[self.connected_ap].queue_data(self.mac, data)
             return True
         return False
 
@@ -47,12 +50,15 @@ class WifiSim(WifiAPI):
 
         return False
 
+    def queue_connection(self, mac):
+        self.data_queue.append((2, mac))
+
     def connect_to_ap(self, ap_mac):
         if not self.connected_ap:
             if self.is_visible(ap_mac):
-                self.direct_conns[ap_mac] = WifiSim.Sims[ap_mac]
+                # self.direct_conns[ap_mac] = WifiSim.Sims[ap_mac]
                 self.connected_ap = ap_mac
-                WifiSim.Sims[ap_mac].station_connection(self.mac)
+                WifiSim.Sims[ap_mac].queue_connection(self.mac)
             else:
                 self.prt("Cant see {}".format(ap_mac))
 
@@ -64,14 +70,20 @@ class WifiSim(WifiAPI):
             self.on_ap_connection_handler(sta_mac)
 
     def get_direct_connections(self):
-        return list(self.direct_conns.keys())
+        conns = list(self.direct_conns.keys())
+        if self.connected_ap:
+            conns.append(self.connected_ap)
+        return conns
+
+    def queue_disconnection(self, mac):
+        self.data_queue.append((3, mac))
 
     def disconnect_from_ap(self):
         if self.connected_ap:
-            del self.direct_conns[self.connected_ap]
+            # del self.direct_conns[self.connected_ap]
             mac_to_disconnect = self.connected_ap
             self.connected_ap = None
-            WifiSim.Sims[mac_to_disconnect].mac_disconnected(self.mac)
+            WifiSim.Sims[mac_to_disconnect].queue_disconnection(self.mac)
 
     def get_connected_ap(self):
         return self.connected_ap
@@ -106,6 +118,11 @@ class WifiSim(WifiAPI):
                     all_empty = False
                     while mod.data_queue:
                         data = mod.data_queue.pop(0)
-                        mod.handle_incoming_data(data[0], data[1])
+                        if data[0] == 1:
+                            mod.handle_incoming_data(data[1], data[2])
+                        elif data[0] == 2:
+                            mod.station_connection(data[1])
+                        elif data[0] == 3:
+                            mod.mac_disconnected(data[1])
             if all_empty:
                 break

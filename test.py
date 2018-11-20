@@ -1,26 +1,32 @@
 from routing_v2 import Routing
 from wifi_sim import WifiSim
+from topology import Topology
 
 class App():
     def __init__(self):
         self.w = WifiSim()
         self.r = Routing(self.w)
-        self.r.register_recv_msg_handler(self.recv_msg)
-        self.mac = self.r.mac
+        self.t = Topology(self.r)
+        self.t.register_recv_msg_handler(self.recv_msg)
+        self.mac = self.t.mac
 
     def put_in_range(self, other, s):
-        pass
-        # self.w.add_visible_mac(other.mac, s)
-        # other.w.add_visible_mac(self.mac, s)
+        self.w.add_visible_mac(other.mac, s)
+        other.w.add_visible_mac(self.mac, s)
 
-        # self.r.tick_topology_algo()
-        # other.r.tick_topology_algo()
-        # WifiSim.simulate()
-        # WifiSim.simulate()
-        # self.r.tick_topology_algo()
-        # other.r.tick_topology_algo()
-        # WifiSim.simulate()
-        # WifiSim.simulate()
+        Topology.simulate()
+        WifiSim.simulate()
+        Topology.simulate()
+        WifiSim.simulate()
+
+    def put_in_range_seq(self, other, s):
+        self.w.add_visible_mac(other.mac, s)
+
+        Topology.simulate()
+        WifiSim.simulate()
+        other.w.add_visible_mac(self.mac, s)
+        Topology.simulate()
+        WifiSim.simulate()
 
     def take_out_of_range(self, other):
         pass
@@ -41,11 +47,31 @@ class App():
         WifiSim.simulate()
 
     def send_message(self, mac, msg):
-        self.r.send_message(mac, msg)
+        self.t.send_msg(mac, msg)
         WifiSim.simulate()
 
     def recv_msg(self, from_mac, msg):
-        self.w.prt("MSG from {}: {}".format(from_mac, msg))
+        print("APP {}: MSG from {}: {}".format(self.mac, from_mac, msg))
+
+    def is_consistent_graph(self):
+        print("Consitent for {}?".format(self.mac))
+        graph = self.t.router.get_graph()
+        for t in Topology.Sims:
+            tg = t.router.get_graph()
+            for node in tg:
+                for elt in tg[node].adj_node_dict:
+                    if node in graph:
+                        if elt in graph[node].adj_node_dict:
+                            if tg[node].adj_node_dict[elt] != graph[node].adj_node_dict[elt]:
+                                print("{}: {}[{}] expected {} got {}".format(t.mac, node, elt, graph[node].adj_node_dict[elt], tg[node].adj_node_dict[elt]))        
+                                break
+                        else:
+                            print("{}: elt {} not node's {} list".format(t.mac, elt, node))    
+                            break
+                    else:
+                        print("{}: Node {} not in graph".format(t.mac, node))
+                        break
+        print("Finished consistent for {}?".format(self.mac))
 
 a1 = App()
 a2 = App()
@@ -61,6 +87,24 @@ a2.send_message(a1.mac, "Hi from 2")
 a1.send_message(a2.mac, "Hi back from 1")
 a1.send_message(a3.mac, "Hi to 3 from 1")
 a4.send_message(a1.mac, "Hi to 1 from 4")
+
+# Auto connection and no duplicate connections test
+# a2.put_in_range_seq(a1, 5)
+# a3.put_in_range_seq(a1, 7)
+# a4.put_in_range_seq(a1, 5)
+
+# a4.put_in_range_seq(a2, 10)
+
+# a1.is_consistent_graph()
+# a2.is_consistent_graph()
+# a3.is_consistent_graph()
+# a4.is_consistent_graph()
+# print(a1.r.get_graph())
+
+# a2.send_message(a1.mac, "Hi from 2")
+# a1.send_message(a2.mac, "Hi back from 1")
+# a1.send_message(a3.mac, "Hi to 3 from 1")
+# a4.send_message(a3.mac, "Hi to 3 from 4")
 
 # Sparse connection test
 # a1.put_in_range(a2, 5)
