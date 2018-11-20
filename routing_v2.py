@@ -17,7 +17,7 @@ class Routing(RoutingAPI):
         self.wifi.get_direct_connections()
 
     def disconnect_from_ap(self):
-        self.mac_disconnected(self.get_connected_ap())
+        # self.mac_disconnected(self.get_connected_ap())
         self.wifi.disconnect_from_ap()
 
     def get_connected_ap(self):
@@ -31,27 +31,20 @@ class Routing(RoutingAPI):
     def mac_disconnected(self, mac):
         # Could be a duplicate connection disconnection
         if mac not in self.get_direct_conns():
-            self.seq_num += 1
+            if mac in self.graph:
+                self.seq_num = max(self.seq_num, self.graph[mac].seq_num) + 1
+            else:
+                self.seq_num += 1
             # remove edge
-            self.remove_edge(self.mac, mac)
+            self.remove_edge(self.mac, mac, self.seq_num)
             # send flood to network
-            self.send_flood(None, self.mac, self.seq_num, 1, self.mac, mac)
-
-    # adds an edge to the graph
-    def add_graph_edge(self, ap_mac, sta_mac):
-        self.add_edge(ap_mac, sta_mac)
-        self.seq_num += 1
-        self.send_flood(None, self.mac, self.seq_num, 0, ap_mac, sta_mac)
+            self.send_flood([], self.mac, self.seq_num, 1, self.mac, mac)
 
     # called when a station connects to my access point
     def sta_connected(self, sta_mac):
-        # add edges to graph
-        self.add_edge(self.mac, sta_mac)
+        self.seq_num += 1
         # send bootstrap message
         self.send_bootstrap(sta_mac)
-        # send flood to network
-        # self.seq_num += 1
-        # self.send_flood(None, self.mac, self.seq_num, 0, self.mac, sta_mac)
 
     # return the routing graph
     def get_graph(self):
@@ -79,9 +72,9 @@ class Routing(RoutingAPI):
         # Directed packet (orig,seq_num,dest,msg)
         elif packets[0] == "D":
             self.on_receive_d(prev_mac, packets[1], int(packets[2]), packets[3], packets[4])
-        # Bootstrap packet (get graph)
+        # Bootstrap packet (seq_num,graph)
         elif packets[0] == "B":
-            self.on_receive_b(prev_mac, packets[1])
+            self.on_receive_b(prev_mac, int(packets[1]), packets[2])
 
         # self.prt("graph after proc: {}".format(self.graph))
 
@@ -93,11 +86,18 @@ class Routing(RoutingAPI):
         if mac not in self.graph:
             self.graph[mac] = GraphEntry(seq_num=0, adj_node_dict={})
 
-    def add_edge(self, mac_ap, mac_sta):
+    def add_edge(self, mac_ap, mac_sta, seq_num):
         self.create_node(mac_ap)
         self.create_node(mac_sta)
-        self.graph[mac_ap].adj_node_dict[mac_sta] = 0
-        self.graph[mac_sta].adj_node_dict[mac_ap] = 1
+        if max(self.graph[mac_ap].seq_num, self.graph[mac_sta].seq_num) <= seq_num:
+            self.graph[mac_ap].adj_node_dict[mac_sta] = 0
+            self.graph[mac_sta].adj_node_dict[mac_ap] = 1
+            # update sequence numbers
+            self.graph[mac_ap].seq_num = seq_num
+            self.graph[mac_sta].seq_num = seq_num
+            # potentially update own seq num
+            if mac_ap == self.mac or mac_sta == self.mac:
+                self.seq_num = max(self.seq_num, seq_num)
 
     def prune_graph(self):
         disconnected_nodes = []
@@ -106,8 +106,9 @@ class Routing(RoutingAPI):
 
         queue = []
         visited = {}
-        queue.append(self.mac)
-        visited[self.mac] = True
+        if self.mac in self.graph:
+            queue.append(self.mac)
+            visited[self.mac] = True
         while queue:
             node = queue.pop(0)
             disconnected_nodes.remove(node)
@@ -120,13 +121,17 @@ class Routing(RoutingAPI):
             del self.graph[node]
 
 
-    def remove_edge(self, mac_1, mac_2):
-        # remove 2 from 1
-        if mac_1 in self.graph and mac_2 in self.graph[mac_1].adj_node_dict:
-            del self.graph[mac_1].adj_node_dict[mac_2]
-        # remove 1 from 2
-        if mac_2 in self.graph and mac_1 in self.graph[mac_2].adj_node_dict:
-            del self.graph[mac_2].adj_node_dict[mac_1]
+    def remove_edge(self, mac_1, mac_2, seq_num):
+        if mac_1 in self.graph and mac_2 in self.graph:
+            if max(self.graph[mac_1].seq_num, self.graph[mac_2].seq_num) <= seq_num:
+                del self.graph[mac_1].adj_node_dict[mac_2]
+                del self.graph[mac_2].adj_node_dict[mac_1]
+                # update sequence numbers
+                self.graph[mac_1].seq_num = seq_num
+                self.graph[mac_2].seq_num = seq_num
+                # potentially update own seq num
+                if mac_1 == self.mac or mac_2 == self.mac:
+                    self.seq_num = max(self.seq_num, seq_num)
 
         # prune graph if we now have 2 components
         self.prune_graph()
@@ -162,39 +167,58 @@ class Routing(RoutingAPI):
                     visited[mac] = True
         return None
 
-    # return all edges with conn_type == 0
+    # return all edges with conn_type == 1 (station->ap)
     def get_ap_connections(self):
         conns = []
         for node in self.graph:
             for entry in self.graph[node].adj_node_dict:
-                if self.graph[node].adj_node_dict[entry] == 0:
-                    conns.append((node, entry))
+                if self.graph[node].adj_node_dict[entry] == 1:
+                    conns.append((node, self.graph[node].seq_num, entry))
 
         return conns
 
-    def on_receive_b(self, prev_mac, data):
-        # bootstrap packets are as follows "from_mac|seq_num|to_mac1|conn_type1|...|\nfrom_mac"
+    def on_receive_b(self, prev_mac, seq_num, data):
+        # get my connections before adding new ones
+        my_side = self.get_ap_connections()
+
+        other_side = []
+        # bootstrap packets are as follows "from_mac|seq_num|to_mac1\n..."
         nodes = data.split("\n")
         for n in nodes:
             node_data = n.split("|")
-            if len(node_data) >= 2:
+            if len(node_data) >= 3:
+                # station
                 from_mac = node_data[0]
-                from_seq_num = node_data[1]
-                for i in range(2,len(node_data)-1,2):
-                    to_mac = node_data[i]
-                    conn_type = int(node_data[i+1])
-                    # avoid duplicates by only adding conn_type 0
-                    if conn_type == 0:
-                        self.add_edge(from_mac, to_mac)
+                from_seq_num = int(node_data[1])
+                # ap
+                to_mac = node_data[2]
 
-        # TODO smarter flood algorithm
-        # send flood messages of edges not known to either component
-        known_connections = self.get_ap_connections()
-        # self.prt(known_connections)
-        # flood connections
-        for (ap_mac, sta_mac) in known_connections:
-            self.seq_num += 1
-            self.send_flood(None, self.mac, self.seq_num, 0, ap_mac, sta_mac)
+                self.add_edge(to_mac, from_mac, from_seq_num)
+                # prune for cycles?
+                # TODO also prune where edge is same but seq num is different
+                if (from_mac, from_seq_num, to_mac) in my_side:
+                    my_side.remove((from_mac, from_seq_num, to_mac))
+                else:
+                    other_side.append((from_mac, from_seq_num, to_mac))
+                # other_side.append((from_mac, from_seq_num, to_mac))
+
+        # self.prt(my_side)
+        # self.prt(other_side)
+
+        my_side_macs = self.get_direct_conns()
+        my_side_macs.remove(prev_mac)
+        # replay edge connections from my side to the other side
+        for (sta_mac, sta_seq_num, ap_mac) in my_side:
+            self.send_flood(my_side_macs, sta_mac, sta_seq_num, 0, ap_mac, sta_mac)
+        # replay edge connections from other side to my side
+        for (sta_mac, sta_seq_num, ap_mac) in other_side:
+            self.send_flood(prev_mac, sta_mac, sta_seq_num, 0, ap_mac, sta_mac)
+
+        # finally, broadcast my new edge
+        self.seq_num = max(self.seq_num, seq_num) + 1
+        self.add_edge(prev_mac, self.mac, self.seq_num)
+        # send message to create the edge (I am the station)
+        self.send_flood([], self.mac, self.seq_num, 0, prev_mac, self.mac)
 
     def on_receive_d(self, prev_mac, orig_mac, orig_seq_num, dest_mac, msg):
         if self.is_valid_seq_num(orig_mac, orig_seq_num):
@@ -209,11 +233,11 @@ class Routing(RoutingAPI):
         if self.is_valid_seq_num(orig_mac, orig_seq_num):
             if f_type == 0:
                 # create edge
-                self.add_edge(mac_1, mac_2)
+                self.add_edge(mac_1, mac_2, orig_seq_num)
             elif f_type == 1:
                 # remove edge
-                self.remove_edge(mac_1, mac_2)
-            self.send_flood(prev_mac, orig_mac, orig_seq_num, f_type, mac_1, mac_2)
+                self.remove_edge(mac_1, mac_2, orig_seq_num)
+            self.send_flood([prev_mac], orig_mac, orig_seq_num, f_type, mac_1, mac_2)
 
     # dest should be a neighbor
     def send_data(self, dest_mac, msg):
@@ -223,18 +247,15 @@ class Routing(RoutingAPI):
 
     def send_bootstrap(self, bootstrap_mac):
         payload = ""
-        for mac in self.graph:
-            payload += "{}|{}|".format(mac, self.graph[mac].seq_num)
-            for to_mac in self.graph[mac].adj_node_dict:
-                payload += "{}|{}|".format(to_mac, self.graph[mac].adj_node_dict[to_mac])
-            payload += "\n"
+        for (sta_mac, sta_seq_num, ap_mac) in self.get_ap_connections():
+            payload += "{}|{}|{}\n".format(sta_mac, sta_seq_num, ap_mac)
 
-        self.send_data(bootstrap_mac, "B,{}".format(payload))
+        self.send_data(bootstrap_mac, "B,{},{}".format(self.seq_num, payload))
 
     def send_directed(self, next_mac, orig_mac, orig_seq_num, dest_mac, msg):
         self.send_data(next_mac, "D,{},{},{},{}".format(orig_mac, orig_seq_num, dest_mac, msg))
 
-    def send_flood(self, prev_mac, orig_mac, orig_seq_num, f_type, mac_1, mac_2):
+    def send_flood(self, exclude_macs, orig_mac, orig_seq_num, f_type, mac_1, mac_2):
         for neighbor_mac in self.get_direct_conns():
-            if neighbor_mac != prev_mac:
+            if neighbor_mac not in exclude_macs:
                 self.send_data(neighbor_mac, "F,{},{},{},{},{}".format(orig_mac, orig_seq_num, f_type, mac_1, mac_2))

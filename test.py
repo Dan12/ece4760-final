@@ -46,6 +46,13 @@ class App():
         self.w.connect_to_ap(other.mac)
         WifiSim.simulate()
 
+    def disconnect(self, other):
+        self.w.remove_visible_mac(other.mac)
+        other.w.remove_visible_mac(self.mac)
+        self.w.mac_disconnected(other.mac)
+        other.w.mac_disconnected(self.mac)
+        WifiSim.simulate()
+
     def send_message(self, mac, msg):
         self.t.send_msg(mac, msg)
         WifiSim.simulate()
@@ -79,21 +86,26 @@ a3 = App()
 a4 = App()
 
 # Basic routing test (manual connections)
-a1.connect(a2)
-a3.connect(a2)
-a4.connect(a2)
+# a1.connect(a2)
+# a3.connect(a2)
+# a4.connect(a2)
 
-a2.send_message(a1.mac, "Hi from 2")
-a1.send_message(a2.mac, "Hi back from 1")
-a1.send_message(a3.mac, "Hi to 3 from 1")
-a4.send_message(a1.mac, "Hi to 1 from 4")
+# a2.send_message(a1.mac, "Hi from 2")
+# a1.send_message(a2.mac, "Hi back from 1")
+# a1.send_message(a3.mac, "Hi to 3 from 1")
+# a4.send_message(a1.mac, "Hi to 1 from 4")
 
-# Auto connection and no duplicate connections test
-# a2.put_in_range_seq(a1, 5)
-# a3.put_in_range_seq(a1, 7)
-# a4.put_in_range_seq(a1, 5)
-
-# a4.put_in_range_seq(a2, 10)
+# a1.disconnect(a2)
+# a1.connect(a4)
+# a1.send_message(a3.mac, "Hi to 3 from 1-2")
+# a2.connect(a1)
+# a1.send_message(a3.mac, "Hi to 3 from 1-3")
+# a2.disconnect(a1)
+# a4.disconnect(a2)
+# a1.send_message(a3.mac, "Hi to 3 from 1-4")
+# a4.connect(a3)
+# a1.send_message(a3.mac, "Hi to 3 from 1-5")
+# a1.send_message(a2.mac, "Hi to 2 from 1-2")
 
 # a1.is_consistent_graph()
 # a2.is_consistent_graph()
@@ -101,10 +113,23 @@ a4.send_message(a1.mac, "Hi to 1 from 4")
 # a4.is_consistent_graph()
 # print(a1.r.get_graph())
 
-# a2.send_message(a1.mac, "Hi from 2")
-# a1.send_message(a2.mac, "Hi back from 1")
-# a1.send_message(a3.mac, "Hi to 3 from 1")
-# a4.send_message(a3.mac, "Hi to 3 from 4")
+# Auto connection and no duplicate connections test
+a2.put_in_range(a1, 5)
+a3.put_in_range(a1, 7)
+a4.put_in_range(a1, 5)
+
+a4.put_in_range_seq(a2, 10)
+
+a1.is_consistent_graph()
+a2.is_consistent_graph()
+a3.is_consistent_graph()
+a4.is_consistent_graph()
+print(a1.r.get_graph())
+
+a2.send_message(a1.mac, "Hi from 2")
+a1.send_message(a2.mac, "Hi back from 1")
+a1.send_message(a3.mac, "Hi to 3 from 1")
+a4.send_message(a3.mac, "Hi to 3 from 4")
 
 # Sparse connection test
 # a1.put_in_range(a2, 5)

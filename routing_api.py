@@ -70,8 +70,3 @@ class RoutingAPI(ABC):
     @abstractmethod
     def get_visible_macs(self):
         pass
-
-    # adds an edge
-    @abstractmethod
-    def add_graph_edge(self, ap_mac, sta_mac):
-        pass
