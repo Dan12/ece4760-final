@@ -143,7 +143,6 @@ class Topology(TopologyAPI):
                 self.router.connect_to_ap(max_mac)
                 return
 
-
         # sparse connection algorithm
         # if I see a AP in the mesh with an in degree at least 2 smaller than
         # the AP I am connected to disconnect from current AP and connect to other AP

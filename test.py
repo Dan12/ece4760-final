@@ -31,16 +31,15 @@ class App():
         WifiSim.simulate()
 
     def take_out_of_range(self, other):
-        pass
-        # self.w.remove_visible_mac(other.mac)
-        # other.w.remove_visible_mac(self.mac)
-        # self.w.mac_disconnected(other.mac)
-        # other.w.mac_disconnected(self.mac)
+        self.w.remove_visible_mac(other.mac)
+        other.w.remove_visible_mac(self.mac)
+        self.w.mac_disconnected(other.mac)
+        other.w.mac_disconnected(self.mac)
 
-        # self.r.tick_topology_algo()
-        # WifiSim.simulate()
-        # other.r.tick_topology_algo()
-        # WifiSim.simulate()
+        Topology.simulate()
+        WifiSim.simulate()
+        Topology.simulate()
+        WifiSim.simulate()
 
     def connect(self, other):
         self.w.add_visible_mac(other.mac, 1)
@@ -114,6 +113,7 @@ a4 = App()
 # a3.is_consistent_graph()
 # a4.is_consistent_graph()
 # print(a1.r.get_graph())
+# print(a2.r.get_graph())
 
 # Auto connection and Sparse connection test
 # a2.put_in_range(a1, 5)
@@ -153,9 +153,15 @@ a3.is_consistent_graph()
 a4.is_consistent_graph()
 print(a1.r.get_graph())
 
-# a3.take_out_of_range(a2)
-# a1.send_message(a4.mac, "Hi to 4 from 1-2")
+a3.take_out_of_range(a2)
+a1.send_message(a4.mac, "Hi to 4 from 1-2")
 
-# a3.put_in_range(a2, 7)
-# a1.send_message(a4.mac, "Hi to 4 from 1-3")
-# a4.send_message(a1.mac, "Hi to 1 from 4-3")
+a3.put_in_range(a2, 7)
+a1.send_message(a4.mac, "Hi to 4 from 1-3")
+a4.send_message(a1.mac, "Hi to 1 from 4-3")
+
+a1.is_consistent_graph()
+a2.is_consistent_graph()
+a3.is_consistent_graph()
+a4.is_consistent_graph()
+print(a1.r.get_graph())

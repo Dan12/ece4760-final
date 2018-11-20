@@ -31,10 +31,7 @@ class Routing(RoutingAPI):
     def mac_disconnected(self, mac):
         # Could be a duplicate connection disconnection
         if mac not in self.get_direct_conns():
-            if mac in self.graph:
-                self.seq_num = max(self.seq_num, self.graph[mac].seq_num) + 1
-            else:
-                self.seq_num += 1
+            self.seq_num += 1
             # remove edge
             self.remove_edge(self.mac, mac, self.seq_num)
             # send flood to network
@@ -43,6 +40,8 @@ class Routing(RoutingAPI):
     # called when a station connects to my access point
     def sta_connected(self, sta_mac):
         self.seq_num += 1
+        if self.mac in self.graph:
+            self.graph[self.mac].seq_num = self.seq_num
         # send bootstrap message
         self.send_bootstrap(sta_mac)
 
@@ -56,6 +55,8 @@ class Routing(RoutingAPI):
         next_hop = self.find_next_hop(dest_mac)
         if next_hop:
             self.seq_num += 1
+            if self.mac in self.graph:
+                self.graph[self.mac].seq_num = self.seq_num
             self.send_directed(next_hop, self.mac, self.seq_num, dest_mac, msg)
         else:
             self.prt("WARNING: no next hop found for {}".format(dest_mac))
@@ -89,15 +90,11 @@ class Routing(RoutingAPI):
     def add_edge(self, mac_ap, mac_sta, seq_num):
         self.create_node(mac_ap)
         self.create_node(mac_sta)
-        if max(self.graph[mac_ap].seq_num, self.graph[mac_sta].seq_num) <= seq_num:
+        if self.graph[mac_sta].seq_num <= seq_num:
             self.graph[mac_ap].adj_node_dict[mac_sta] = 0
             self.graph[mac_sta].adj_node_dict[mac_ap] = 1
-            # update sequence numbers
-            self.graph[mac_ap].seq_num = seq_num
+            # update sequence number
             self.graph[mac_sta].seq_num = seq_num
-            # potentially update own seq num
-            if mac_ap == self.mac or mac_sta == self.mac:
-                self.seq_num = max(self.seq_num, seq_num)
 
     def prune_graph(self):
         disconnected_nodes = []
@@ -120,18 +117,15 @@ class Routing(RoutingAPI):
         for node in disconnected_nodes:
             del self.graph[node]
 
-
     def remove_edge(self, mac_1, mac_2, seq_num):
         if mac_1 in self.graph and mac_2 in self.graph:
-            if max(self.graph[mac_1].seq_num, self.graph[mac_2].seq_num) <= seq_num:
-                del self.graph[mac_1].adj_node_dict[mac_2]
-                del self.graph[mac_2].adj_node_dict[mac_1]
-                # update sequence numbers
+            if self.graph[mac_1].seq_num <= seq_num:
+                if mac_2 in self.graph[mac_1].adj_node_dict:
+                    del self.graph[mac_1].adj_node_dict[mac_2]
+                if mac_1 in self.graph[mac_2].adj_node_dict:
+                    del self.graph[mac_2].adj_node_dict[mac_1]
+                # update sequence number
                 self.graph[mac_1].seq_num = seq_num
-                self.graph[mac_2].seq_num = seq_num
-                # potentially update own seq num
-                if mac_1 == self.mac or mac_2 == self.mac:
-                    self.seq_num = max(self.seq_num, seq_num)
 
         # prune graph if we now have 2 components
         self.prune_graph()
@@ -177,6 +171,12 @@ class Routing(RoutingAPI):
 
         return conns
 
+    def is_in_my_side(self, from_mac, from_seq_num, to_mac, my_side):
+        for (s_mac, s_seq, a_mac) in my_side:
+            if from_mac == s_mac and to_mac == a_mac and s_seq < from_seq_num:
+                return (s_mac, s_seq, a_mac)
+        return None
+
     def on_receive_b(self, prev_mac, seq_num, data):
         # get my connections before adding new ones
         my_side = self.get_ap_connections()
@@ -195,16 +195,17 @@ class Routing(RoutingAPI):
 
                 self.add_edge(to_mac, from_mac, from_seq_num)
                 # prune for cycles?
-                # TODO also prune where edge is same but seq num is different
+                # TODO also prune where edge is same but seq num is lower
+                in_my_side = self.is_in_my_side(from_mac, from_seq_num, to_mac, my_side)
                 if (from_mac, from_seq_num, to_mac) in my_side:
                     my_side.remove((from_mac, from_seq_num, to_mac))
+                elif in_my_side:
+                    my_side.remove(in_my_side)
+                    other_side.append((from_mac, from_seq_num, to_mac))
                 else:
                     other_side.append((from_mac, from_seq_num, to_mac))
                 # other_side.append((from_mac, from_seq_num, to_mac))
-
-        # self.prt(my_side)
-        # self.prt(other_side)
-
+                
         my_side_macs = self.get_direct_conns()
         my_side_macs.remove(prev_mac)
         # replay edge connections from my side to the other side
@@ -215,7 +216,7 @@ class Routing(RoutingAPI):
             self.send_flood(prev_mac, sta_mac, sta_seq_num, 0, ap_mac, sta_mac)
 
         # finally, broadcast my new edge
-        self.seq_num = max(self.seq_num, seq_num) + 1
+        self.seq_num = self.seq_num + 1
         self.add_edge(prev_mac, self.mac, self.seq_num)
         # send message to create the edge (I am the station)
         self.send_flood([], self.mac, self.seq_num, 0, prev_mac, self.mac)
