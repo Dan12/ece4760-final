@@ -73,9 +73,9 @@ class Routing(RoutingAPI):
         # Directed packet (orig,seq_num,dest,msg)
         elif packets[0] == "D":
             self.on_receive_d(prev_mac, packets[1], int(packets[2]), packets[3], packets[4])
-        # Bootstrap packet (seq_num,graph)
+        # Bootstrap packet (graph)
         elif packets[0] == "B":
-            self.on_receive_b(prev_mac, int(packets[1]), packets[2])
+            self.on_receive_b(prev_mac, packets[1])
 
         # self.prt("graph after proc: {}".format(self.graph))
 
@@ -177,7 +177,7 @@ class Routing(RoutingAPI):
                 return (s_mac, s_seq, a_mac)
         return None
 
-    def on_receive_b(self, prev_mac, seq_num, data):
+    def on_receive_b(self, prev_mac, data):
         # get my connections before adding new ones
         my_side = self.get_ap_connections()
 
@@ -192,6 +192,8 @@ class Routing(RoutingAPI):
                 from_seq_num = int(node_data[1])
                 # ap
                 to_mac = node_data[2]
+
+                # TODO potentially remove edge if STA->AP connection is inconsistent
 
                 self.add_edge(to_mac, from_mac, from_seq_num)
                 # prune for cycles?
@@ -251,7 +253,7 @@ class Routing(RoutingAPI):
         for (sta_mac, sta_seq_num, ap_mac) in self.get_ap_connections():
             payload += "{}|{}|{}\n".format(sta_mac, sta_seq_num, ap_mac)
 
-        self.send_data(bootstrap_mac, "B,{},{}".format(self.seq_num, payload))
+        self.send_data(bootstrap_mac, "B,{}".format(payload))
 
     def send_directed(self, next_mac, orig_mac, orig_seq_num, dest_mac, msg):
         self.send_data(next_mac, "D,{},{},{},{}".format(orig_mac, orig_seq_num, dest_mac, msg))

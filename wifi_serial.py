@@ -1,8 +1,11 @@
 class WifiSerial:
     def __init__(self, ser, prt):
         self.ser = ser
-        self.prt = prt
+        # self.prt = prt
         self.proc_queue = []
+
+    def prt(self, msg):
+        pass
 
     def pop_proc_queue(self):
         if self.proc_queue:
@@ -15,10 +18,11 @@ class WifiSerial:
         return line
 
     def write_data(self, linkId, data):
+        self.prt("Sending to {}: {}".format(linkId, data))
         ser = self.ser
 
         ser.flushInput()
-        self.write_cmd("AT+CIPSEND=" + str(linkId) + "," + str(len(data)) + "\r\n")
+        self.write_cmd("AT+CIPSENDBUF=" + str(linkId) + "," + str(len(data)) + "\r\n")
 
         ser.write((data).encode())
         while(1):
