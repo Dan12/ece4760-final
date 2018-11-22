@@ -25,8 +25,9 @@ void send_byte(char b, UART_MODULE m) {
 /**
  * 
  * @param timeout
- * @return 0 if newline seen, 1 if buffer overflowed, 2 if timed out
+ * @return 0 if term seen, 1 if buffer overflowed, 2 if timed out
  */
+// TODO handle ERROR and return
 int get_data(int timeout, UART_MODULE m, char* term, int echo, char* ret_buf, int* len) {
   static int start_time;
   start_time = time_tick_millsec;
