@@ -159,9 +159,7 @@ class WifiReal(WifiAPI):
         self.serial.write_data(linkId, "P#{}\n".format(PING_TIME))
 
     def process_line(self, line):
-        if line.startswith("+STA_CONNECTED"):
-            pass
-        elif line.startswith("+IPD"):
+        if line.startswith("+IPD"):
             idx1 = line.index(",")
             idx2 = line.index(",", idx1+1)
             idx3 = line.index(":", idx2+1)
@@ -171,10 +169,6 @@ class WifiReal(WifiAPI):
             data = line[idx3+1:idx3+dataLen]
             # self.prt("got data for {} of len {}".format(linkId, dataLen))
             self.process_data(linkId, data)
-        elif line.startswith("+DIST_STA_IP"):
-            pass
-        elif line.startswith("+LINK_CONN"):
-            pass
         elif line.endswith(",CONNECT\r\n"):
             linkId = int(line[:-len(",CONNECT\r\n")])
             self.reserve_conn(linkId)

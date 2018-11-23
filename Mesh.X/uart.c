@@ -25,7 +25,7 @@ void send_byte(char b, UART_MODULE m) {
 /**
  * 
  * @param timeout
- * @return 0 if term seen, 1 if buffer overflowed, 2 if timed out
+ * @return 1 if success, 0 otherwise
  */
 // TODO handle ERROR and return
 int get_data(int timeout, UART_MODULE m, char* term, int echo, char* ret_buf, int* len) {
@@ -56,17 +56,16 @@ int get_data(int timeout, UART_MODULE m, char* term, int echo, char* ret_buf, in
           send_byte('\n', m);
         }
         ret_buf[*len] = '\0';
-        return 0;
+        return 1;
       }
       
-      // check for termination
-      if (*len == buf_len-1) {
-        ret_buf[*len] = '\0';
-        return 1;
+      // check for overrun
+      if (*len == buf_len) {
+        return 0;
       }
     }
     if (time_tick_millsec - start_time > timeout) {
-      return 2;
+      return 0;
     }
   }
 }
@@ -101,17 +100,16 @@ int get_data_dma(int timeout, char* term, int echo, char* ret_buf, int* len) {
           send_byte('\n', dma_uart_chnl);
         }
         ret_buf[*len] = '\0';
-        return 0;
+        return 1;
       }
       
-      // check for termination
-      if (*len == buf_len-1) {
-        ret_buf[*len] = '\0';
-        return 1;
+      // check for overrun
+      if (*len == buf_len) {
+        return 0;
       }
     }
     if (time_tick_millsec - start_time > timeout) {
-      return 2;
+      return 0;
     }
   }
 }

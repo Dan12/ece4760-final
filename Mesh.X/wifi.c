@@ -1,15 +1,20 @@
 #include "wifi.h"
 #include "uart.h"
 #include "string_util.h"
+#include "timer.h"
 
 static void(*recv_handler)(unsigned int mac, char* msg);
 static void(*disconnection_handler)(unsigned int mac);
 static void(*connection_handler)(unsigned int mac);
 
 #define MAX_CONNECTIONS 5
+// Holds the mappings from link id to all connected macs
 static int link_id_to_mac[MAX_CONNECTIONS];
+// holds the mac of the currently connected ap
 static int connected_ap_mac = 0;
 
+#define PING_MS 5000
+#define PING_MS_STR "5000"
 static int time_to_ping[MAX_CONNECTIONS];
 
 #define MAX_VISIBLE_MACS 10
@@ -20,13 +25,157 @@ static char read_buffer[BUFFER_SIZE];
 static int buf_ptr = 0;
 static int most_recent_result = 0;
 
+enum INFO_TYPE {
+  DATA,
+  OPENED,
+  CLOSED
+};
+
+typedef struct information_packet {
+  enum INFO_TYPE t;
+  int link_id;
+  char* data;
+} information_packet;
+#define MAX_NUM_INFO_PACKETS 20
+information_packet packet_buffer[MAX_NUM_INFO_PACKETS];
+int packet_buffer_writer = 0;
+int packet_buffer_reader = 0;
+
+#define MAX_DATA_BUFFERS 10
+char data_buffers[MAX_DATA_BUFFERS][BUFFER_SIZE];
+int next_max_data_buffer = 0;
+
+void allocate_packet(enum INFO_TYPE t, int link_id, char* data) {
+  packet_buffer[packet_buffer_writer].t = t;
+  packet_buffer[packet_buffer_writer].link_id = link_id;
+  packet_buffer[packet_buffer_writer].data = NULL;
+  if (data != NULL) {
+    char* new_data_buffer = (char*) data_buffers[next_max_data_buffer];
+    next_max_data_buffer = (next_max_data_buffer + 1) % MAX_DATA_BUFFERS;
+    strcpy(new_data_buffer, data);
+    
+    packet_buffer[packet_buffer_writer].data = new_data_buffer;
+  }
+  packet_buffer_writer = (packet_buffer_writer + 1) % MAX_NUM_INFO_PACKETS;
+}
+
+void process_line(char* line) {
+  int len = strlen(line);
+  if (starts_with(line, len, "+IPD", 4) == 0) {
+    char* tmp = strtok(line, "IPD");
+    tmp = strtok(NULL, ",");
+    int link_id = atoi(strtok(NULL, ","));
+    int len = atoi(strtok(NULL, ":"));
+    char* msg = strtok(NULL, "\n");
+    allocate_packet(DATA, link_id, msg);
+  } else if (ends_with(line, len, ",CONNECT\r\n", 10)) {
+    int link_id = atoi(strtok(line, ","));
+    allocate_packet(DATA, link_id, NULL);
+  } else if (ends_with(line, len, ",CLOSED\r\n", 9)) {
+    int link_id = atoi(strtok(line, ","));
+    allocate_packet(DATA, link_id, NULL);
+  }
+}
+
+void link_id_disconnected(int link_id) {
+  int mac = link_id_to_mac[link_id];
+  if (mac != 0) {
+    if (mac == connected_ap_mac) {
+      connected_ap_mac = 0;
+      link_id_to_mac[link_id] = 0;
+      
+      disconnection_handler(mac);
+    }
+  }
+}
+
+void ping(int link_id) {
+  send_data(link_id, "P," PING_MS_STR);
+}
+
+void process_data(int link_id, char* type, char* data) {
+  if (strcmp(type, "CS") == 0) {
+    int mac = parse_mac(data);
+    link_id_to_mac[link_id] = mac;
+    
+    ping(link_id);
+    
+    connection_handler(mac);
+  } else if (strcmp(type, "P") == 0) {
+    time_to_ping[link_id] = time_tick_millsec + PING_MS;
+  } else if (strcmp(type, "M") == 0) {
+    recv_handler(link_id_to_mac[link_id], data);
+  }
+}
+
+void process_packet_buffer() {
+  while(packet_buffer_reader != packet_buffer_writer) {
+    information_packet p = packet_buffer[packet_buffer_reader];
+    if (p.t == CLOSED) {
+      link_id_disconnected(p.link_id);
+    } else if (p.t == OPENED) {
+      // set it to not 0 so that it can't be used in get_next_link_id
+      link_id_to_mac[p.link_id] = -1;
+    } else if (p.t == DATA) {
+      char* next = strchr(p.data, ',');
+      next[0] = '\0';
+      next++;
+      process_data(p.link_id, p.data, next);
+    }
+    
+    packet_buffer_reader = (packet_buffer_reader + 1) % MAX_NUM_INFO_PACKETS;
+  }
+}
+
+static char cmd_buf[256];
+
+#define SEND_CMD_OK(cmd) \
+send_cmd(cmd, UART_ESP); \
+buf_ptr = BUFFER_SIZE; \
+most_recent_result = get_data_dma(DEFAULT_TIMEOUT, "OK\r\n", 0, read_buffer, &buf_ptr); \
+if (!most_recent_result) return 0;
+
 int wifi_setup(char id) {
-  // Call setup code
+  // reset buffers
   static int i;
   for(i = 0; i < MAX_CONNECTIONS; i++) {
     link_id_to_mac[i] = 0;
     time_to_ping[i] = 0;
   }
+  
+  SEND_CMD_OK("AT");
+  
+  SEND_CMD_OK("AT");
+  
+  // setup random IP so that nobody connects to us while we setup
+  SEND_CMD_OK("AT+CWSAP_CUR=\"PLZ-DONT-CONNECT\",\"somerandomnoise97501985\",1,0,4,0");
+  
+  // get info
+  SEND_CMD_OK("AT+GMR");
+  
+  // set to Soft AP + Station mode
+  SEND_CMD_OK("AT+CWMODE=3");
+  
+  // set to Soft AP + Station mode
+  SEND_CMD_OK("AT+CIPAPMAC_CUR?");
+  char* tmp = strtok(read_buffer, "CIPAPMAC_CUR");
+  tmp = strtok(NULL, "\"");
+  char* mac = strtok(NULL, "\"");
+  module_mac = parse_mac(mac);
+  
+  // set local IP address to a different number
+  sprintf(cmd_buf, "AT+CIPAP_CUR=\"192.168.%d.1\",\"192.168.%d.1\",\"255.255.255.0\"", id, id);
+  SEND_CMD_OK(cmd_buf);
+  
+  // allow multiple connections (necessary for TCP server)
+  SEND_CMD_OK("AT+CIPMUX=1");
+  
+  // create a TCP server on port 80
+  SEND_CMD_OK("AT+CIPSERVER=1,80");
+  
+  // set ssid (name), pwd, chnl, enc
+  sprintf(cmd_buf, "AT+CWSAP_CUR=\"ESP8266-%d\",\"1234567890\",5,3", id);
+  SEND_CMD_OK(cmd_buf);
 }
 
 void wifi_register_recv_handler(void(*handler)(unsigned int mac, char* msg)) {
@@ -41,28 +190,156 @@ void wifi_register_sta_connection_handler(void(*handler)(unsigned int sta_mac)) 
   connection_handler = handler;
 }
 
-int wifi_send_data(int dest_mac, char* msg) {
-//  TODO
+/**
+ * 
+ * @param link_id
+ * @param data
+ * @return Return 1 if success, 0 if failure
+ */
+int send_data(int link_id, char* data) {
+  int len = strlen(data);
+  sprintf(cmd_buf, "AT+CIPSEND=%d,%d", link_id, len);
+  SEND_CMD_OK(cmd_buf);
+  
+  while(*data != NULL) {
+    send_byte(*(data++), UART_ESP);
+  }
+  
+  buf_ptr = BUFFER_SIZE;
+  most_recent_result = get_data_dma(DEFAULT_TIMEOUT, "OK\r\n", 0, read_buffer, &buf_ptr);
+  if (!most_recent_result) return 0;
+  
+  return 1;
 }
 
-int wifi_connect_to_ap(int ap_mac);
+/**
+ * 
+ * @param mac
+ * @return the link id for this mac, or -1 if no corresponding link_id
+ */
+int mac_to_link_id(int mac) {
+  static int i;
+  int link_id = -1;
+  for (i = 0; i < MAX_CONNECTIONS; i++) {
+    if (link_id_to_mac[i] == mac) {
+      link_id = i;
+      break;
+    }
+  }
+  return link_id;
+}
+
+/**
+ * 
+ * @param dest_mac
+ * @param msg
+ * @return  1 if success, 0 if failure
+ */
+int wifi_send_data(int dest_mac, char* msg) {
+  int link_id_to_send = mac_to_link_id(dest_mac);
+  if (link_id_to_send != -1) {
+    if (send_data(link_id_to_send, msg) == 1) {
+      // succeeded in sending data
+      return 1;
+    }
+  }
+  return 0;
+}
+
+char* get_visible_ssid(int mac) {
+  static int i = 0;
+  while(visible_macs[i].mac != 0) {
+    if (visible_macs[i].mac == mac) {
+      return visible_macs[i].ssid;
+    }
+  }
+  return NULL;
+}
+
+/**
+ * 
+ * @return next unused link id or -1 if no unused link available
+ */
+int get_next_link_id() {
+  static int i;
+  for (i = 0; i < MAX_CONNECTIONS; i++) {
+    if (link_id_to_mac[i] != 0) {
+      return i;
+    }
+  }
+  return -1;
+}
+
+int wifi_connect_to_ap(int ap_mac) {
+  if (connected_ap_mac == 0) {
+    char* ap_ssid = get_visible_ssid(ap_mac);
+    if (ap_ssid != NULL) {
+      int ap_id = atoi(ap_ssid+13);
+      sprintf(cmd_buf, "AT+CWJAP_CUR=\"%s\",\"1234567890\"", ap_ssid);
+      SEND_CMD_OK(cmd_buf);
+
+      // TODO lower timeout time
+      int link_id = get_next_link_id();
+      sprintf(cmd_buf, "AT+CIPSTART=%d,\"TCP\",\"192.168.%d.1\",80", link_id, ap_id);
+      SEND_CMD_OK(cmd_buf);
+      
+      // send the AP your information
+      sprintf(cmd_buf, "CS,%d", module_mac);
+      if (send_data(link_id, cmd_buf) == 1) {
+        link_id_to_mac[link_id] = ap_mac;
+        connected_ap_mac = ap_mac;
+        return 1;
+      }
+    }
+  }
+  return 0;
+}
 
 /**
  * Disconnect from the ap connected to by connect_to_ap. 
  * If no ap currently connected to, act as NOP
  */
-void wifi_disconnect_from_ap();
+void wifi_disconnect_from_ap() {
+  if (connected_ap_mac != 0) {
+    int link_id_to_close = link_id_to_mac[connected_ap_mac];
+    if (link_id_to_close != -1) {
+      send_cmd("AT+CIPCLOSE", UART_ESP); 
+      buf_ptr = BUFFER_SIZE;
+      most_recent_result = get_data_dma(DEFAULT_TIMEOUT, "OK\r\n", 0, read_buffer, &buf_ptr);
+      if (most_recent_result == 0) {
+        int disconnected_mac = connected_ap_mac;
+        connected_ap_mac = 0;
+        link_id_to_mac[link_id_to_close] = 0;
+        disconnection_handler(disconnected_mac);
+      }
+    }
+  }
+}
 
 /** 
  * Get the mac of the connected AP
  */
-int wifi_get_connected_ap();
+int wifi_get_connected_ap() {
+  return connected_ap_mac;
+}
 
-/**
- * Gets the list of stations and aps directly connected to this wifi module
- * @return list of macs
- */
-int* wifi_get_direct_connections();
+static int direct_connections[MAX_CONNECTIONS+1];
+
+int* wifi_get_direct_connections() {
+  static int i;
+  static int j = 0;
+  for (i = 0; i < MAX_CONNECTIONS; i++) {
+    if (link_id_to_mac[i] != 0) {
+      direct_connections[j++] = link_id_to_mac[i];
+    }    
+  }
+  
+  for(; j < MAX_CONNECTIONS+1; j++) {
+    direct_connections[j] = 0;
+  }
+  
+  return direct_connections;
+}
 
 int parse_mac(char* mac) {
   int result = 0;
@@ -94,9 +371,12 @@ visible_mac* wifi_get_visible_macs() {
       visible_macs[i].mac = parse_mac(mac);
       
       i++;
-      if (i >= MAX_VISIBLE_MACS) break;
+      if (i >= MAX_VISIBLE_MACS-1) break;
     }
     tmp = strtok(NULL, "CWLAP");
+  }
+  for (; i < MAX_VISIBLE_MACS; i++) {
+    visible_macs[i].mac = 0;
   }
   
   return visible_macs;

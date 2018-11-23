@@ -66,7 +66,7 @@ int wifi_get_connected_ap();
 
 /**
  * Gets the list of stations and aps directly connected to this wifi module
- * @return list of macs
+ * @return null terminated (0) list of macs
  */
 int* wifi_get_direct_connections();
 
@@ -79,7 +79,7 @@ typedef struct visible_mac {
 
 /**
  * Get a list of the modules seen by this wifi module
- * @return visible_mac structs of the visible modules
+ * @return null terminated (mac) list of visible_mac structs
  */
 visible_mac* wifi_get_visible_macs();
 

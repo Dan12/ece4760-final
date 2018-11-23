@@ -10,7 +10,7 @@
 
 int ends_with(char* buf, int buf_len, char* term, int term_len);
 
-int starts_with(char* pre, int pre_len, char* str, int str_len);
+int starts_with(char* str, int str_len, char* pre, int pre_len);
 
 #endif	/* STRING_UTIL_H */
 
