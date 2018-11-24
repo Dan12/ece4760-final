@@ -11,6 +11,7 @@
       <itemPath>string_util.h</itemPath>
       <itemPath>wifi.h</itemPath>
       <itemPath>logger.h</itemPath>
+      <itemPath>routing.h</itemPath>
     </logicalFolder>
     <logicalFolder name="LinkerScript"
                    displayName="Linker Files"
@@ -24,6 +25,7 @@
       <itemPath>timer.c</itemPath>
       <itemPath>string_util.c</itemPath>
       <itemPath>wifi.c</itemPath>
+      <itemPath>routing.c</itemPath>
     </logicalFolder>
     <logicalFolder name="ExternalFiles"
                    displayName="Important Files"
