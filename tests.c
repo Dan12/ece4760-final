@@ -104,6 +104,25 @@ int main(void) {
 
   printf("Result: %s\n", (!0) ? "true" : "false");
 
+  char line_buffer[1024];
+  char str4[] = "+CWLAP:(3,\"ESP8266-Mesh-2\",-6,\"86:f3:eb:59:c2:ca\",1,25,-120,5,3,3,0)\r\n+IPD,0,62:M#F,86:f3:eb:59:c2:ca,2,0,1a:fe:34:a0:75:e1,86:f3:eb:59:c2:ca\n\r\n+CWLAP:(1,\"ESP8266-Mesh-4\",-6,\"86:f3:eb:59:c2:ca\",1,25,-120,5,3,3,0)\r\n";
+  str_i = str4;
+  tmp = strstr(str_i, "\r\n")+2;
+  printf("%p, %p\n", tmp, str_i);
+  strncpy(line_buffer, str_i, (int) (tmp - str_i));
+  line_buffer[(int) (tmp-str_i)] = '\0';
+  printf("Line: %s\n", line_buffer);
+  str_i = tmp;
+  tmp = strstr(tmp, "\r\n")+2;
+  strncpy(line_buffer, str_i, (int) (tmp - str_i));
+  line_buffer[(int) (tmp-str_i)] = '\0';
+  printf("Line: %s\n", line_buffer);
+  str_i = tmp;
+  tmp = strstr(tmp, "\r\n")+2;
+  strncpy(line_buffer, str_i, (int) (tmp - str_i));
+  line_buffer[(int) (tmp-str_i)] = '\0';
+  printf("Line: %s\n", line_buffer);
+
   // char str4[] = "CS,4,111";
   // // printf("Hello: %s\n", );
   // char* next = strchr(str4, ',');

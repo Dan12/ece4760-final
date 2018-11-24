@@ -21,6 +21,13 @@ static int time_to_ping[MAX_CONNECTIONS];
 #define MAX_VISIBLE_MACS 10
 static visible_mac visible_macs[MAX_VISIBLE_MACS];
 
+// buffer for reading the data from the serial layer
+#define BUFFER_SIZE 1024
+static char _read_buffer[BUFFER_SIZE];
+static char* read_buffer = _read_buffer;
+static int buf_ptr = 0;
+static int most_recent_result = 0;
+
 enum INFO_TYPE {
   DATA,
   OPENED,
@@ -85,19 +92,24 @@ void link_id_disconnected(int link_id) {
   }
 }
 
-// buffer for reading the data from the serial layer
-#define BUFFER_SIZE 1024
-static char read_buffer[BUFFER_SIZE];
-static int buf_ptr = 0;
-static int most_recent_result = 0;
-
+static char line_buffer[1024];
 /**
  * Fills the read buffer and does some line processing
  */
 void fill_read_buffer() {
   buf_ptr = BUFFER_SIZE;
   most_recent_result = get_esp_data(DEFAULT_TIMEOUT, read_buffer, &buf_ptr);
-  
+  char* tmp = strstr(read_buffer, "\r\n")+2;
+  char* prev_tmp = read_buffer;
+  while(tmp != NULL) {
+    strncpy(line_buffer, read_buffer, (int) (tmp - prev_tmp));
+    line_buffer[(int) (tmp - prev_tmp)] = '\0';
+    
+    process_line(line_buffer);
+    
+    prev_tmp = tmp;
+    tmp = strstr(tmp, "\r\n")+2;
+  }
 }
 
 void ping(int link_id) {
@@ -157,8 +169,7 @@ static char cmd_buf[256];
 
 #define SEND_CMD_OK(cmd) \
 send_cmd(cmd, UART_ESP); \
-buf_ptr = BUFFER_SIZE; \
-most_recent_result = get_esp_data(DEFAULT_TIMEOUT, read_buffer, &buf_ptr); \
+fill_read_buffer(); \
 if (!most_recent_result) return 0;
 
 int wifi_setup(char id) {
@@ -231,8 +242,7 @@ int send_data(int link_id, char* data) {
     send_byte(*(data++), UART_ESP);
   }
   
-  buf_ptr = BUFFER_SIZE;
-  most_recent_result = get_esp_data(DEFAULT_TIMEOUT, read_buffer, &buf_ptr);
+  fill_read_buffer();
   if (!most_recent_result) return 0;
   
   return 1;
@@ -330,9 +340,8 @@ void wifi_disconnect_from_ap() {
     int link_id_to_close = link_id_to_mac[connected_ap_mac];
     if (link_id_to_close != -1) {
       send_cmd("AT+CIPCLOSE", UART_ESP); 
-      buf_ptr = BUFFER_SIZE;
-      most_recent_result = get_esp_data(DEFAULT_TIMEOUT, read_buffer, &buf_ptr);
-      if (most_recent_result == 0) {
+      fill_read_buffer();
+      if (most_recent_result) {
         int disconnected_mac = connected_ap_mac;
         connected_ap_mac = 0;
         link_id_to_mac[link_id_to_close] = 0;
@@ -380,8 +389,7 @@ int parse_mac(char* mac) {
 
 visible_mac* wifi_get_visible_macs() {
   send_cmd("AT+CWLAP", UART_ESP);
-  buf_ptr = BUFFER_SIZE;
-  most_recent_result = get_esp_data(DEFAULT_TIMEOUT, read_buffer, &buf_ptr);
+  fill_read_buffer();
   
   char* tmp = strp(&read_buffer, "CWLAP");
   tmp = strp(&read_buffer, "\"");
