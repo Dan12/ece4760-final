@@ -12,17 +12,23 @@
 
 int routing_setup();
 
-void routing_register_recv_handler(void(*handler)(unsigned int mac, char* msg));
+void routing_register_recv_handler(void(*handler)(int mac, char* msg));
 
 typedef struct adj_node_entry {
     int mac;
     int type;
 } adj_node_entry;
 
+static adj_node_entry empty_adj_node_entry = {
+ 0, 0   
+};
+
+#define MAX_NUM_CONNECTIONS 5
+
 typedef struct graph_entry {
     int mac;
     int seq_num;
-    adj_node_entry adj_nodes[5];
+    adj_node_entry adj_nodes[MAX_NUM_CONNECTIONS];
 } graph_entry;
 
 /**

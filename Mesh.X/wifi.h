@@ -28,21 +28,21 @@ void wifi_run();
  * Register a handler for when the wifi module receives a message
  * @param handler
  */
-void wifi_register_recv_handler(void(*handler)(unsigned int mac, char* msg));
+void wifi_register_recv_handler(void(*handler)(int mac, char* msg));
 
 /**
  * Register a handler for when a mac address disconnects from this wifi module
  * Could be AP or STA
  * @param handler
  */
-void wifi_register_direct_disconnection_handler(void(*handler)(unsigned int mac));
+void wifi_register_direct_disconnection_handler(void(*handler)(int mac));
 
 /**
  * Register a handler for when a station connects to this wifi module's
  * AP
  * @param handler
  */
-void wifi_register_sta_connection_handler(void(*handler)(unsigned int sta_mac));
+void wifi_register_sta_connection_handler(void(*handler)(int sta_mac));
 
 /**
  * Send the message to the dest_mac (must be neightbor)

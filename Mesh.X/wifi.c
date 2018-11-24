@@ -4,9 +4,9 @@
 #include "timer.h"
 #include "logger.h"
 
-static void(*recv_handler)(unsigned int mac, char* msg);
-static void(*disconnection_handler)(unsigned int mac);
-static void(*connection_handler)(unsigned int mac);
+static void(*recv_handler)(int mac, char* msg);
+static void(*disconnection_handler)(int mac);
+static void(*connection_handler)(int mac);
 
 #define MAX_CONNECTIONS 5
 // Holds the mappings from link id to all connected macs
@@ -244,15 +244,15 @@ int wifi_setup(char id) {
   SEND_CMD_OK(cmd_buf);
 }
 
-void wifi_register_recv_handler(void(*handler)(unsigned int mac, char* msg)) {
+void wifi_register_recv_handler(void(*handler)(int mac, char* msg)) {
   recv_handler = handler;
 }
 
-void wifi_register_direct_disconnection_handler(void(*handler)(unsigned int mac)) {
+void wifi_register_direct_disconnection_handler(void(*handler)(int mac)) {
   disconnection_handler = handler;
 }
 
-void wifi_register_sta_connection_handler(void(*handler)(unsigned int sta_mac)) {
+void wifi_register_sta_connection_handler(void(*handler)(int sta_mac)) {
   connection_handler = handler;
 }
 

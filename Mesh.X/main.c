@@ -25,20 +25,9 @@
 
 #include "wifi.h"
 #include "logger.h"
+#include "routing.h"
 
 #define DEVICE_ID 1
-
-void dis_h(int mac) {
-  comp_log("APP", "diconnection");
-}
-
-void con_h(int mac) {
-  comp_log("APP", "connection");
-}
-
-void recv_h(int mac, char* msg) {
-  comp_log("APP", msg);
-}
 
 int main(void) {
   
@@ -58,9 +47,7 @@ int main(void) {
     // TODO reset
   }
   
-  wifi_register_sta_connection_handler(con_h);
-  wifi_register_direct_disconnection_handler(dis_h);
-  wifi_register_recv_handler(recv_h);
+  routing_setup();
 
   while(1) {
     wifi_run();
