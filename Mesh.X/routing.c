@@ -1,6 +1,8 @@
 #include <stdio.h>
+#include <string.h>
 
 #include "routing.h"
+#include "string_util.h"
 
 static char send_buf[1024];
 
@@ -164,10 +166,53 @@ int send_msg(int next_hop, char* msg) {
   return 1;
 }
 
+typedef struct station_connection {
+  int sta_mac;
+  int sta_seq_num;
+  int ap_mac;
+} station_connection;
+station_connection station_connections[MAX_NUM_NODES];
+
+// returns a list of all edges of type 1
+void get_station_connections() {
+  int s = 0;
+  int i;
+  for (i = 0; i < MAX_NUM_NODES; i++) {
+    if (graph[i].mac) {
+      int j;
+      for (j = 0; j < MAX_NUM_CONNECTIONS; j++) {
+        if (graph[i].adj_nodes[j].mac) {
+          if (graph[i].adj_nodes[j].type == 1) {
+            station_connections[s].sta_mac = graph[i].mac;
+            station_connections[s].sta_seq_num = graph[i].seq_num;
+            station_connections[s++].ap_mac = graph[i].adj_nodes[j].mac;
+          }
+        }
+      }
+    }
+  }
+  
+  for(; s < MAX_NUM_NODES; s++) {
+    station_connections[s].sta_mac = 0;
+    station_connections[s].sta_seq_num = 0;
+    station_connections[s].ap_mac = 0;
+  }
+}
+
 void send_bootstrap(int bootstrap_mac) {
-// TODO
-//  sprintf(send_buf, "F,%d,%d,%d,%d,%d", orig_mac, orig_seq_num, f_type, mac_1, mac_2);
-//  send_msg(bootstrap_mac, send_buf);
+  char* buf = send_buf;
+  sprintf(buf, "B");
+  buf+=strlen(buf);
+  
+  get_station_connections();
+  int i = 0;
+  while(station_connections[i].sta_mac) {
+    station_connection s = station_connections[i];
+    sprintf(buf, ",%d,%d,%d", s.sta_mac, s.sta_seq_num, s.ap_mac);
+    buf+=strlen(buf);
+    i++;
+  }
+  send_msg(bootstrap_mac, send_buf);
 }
 
 int send_directed(int next_hop, int orig_mac, int orig_seq_num, int dest_mac, char* msg) {
@@ -217,12 +262,74 @@ void mac_disconnected(int mac) {
 }
 
 void sta_connected(int mac) {
-  inc_seq_num()
+  inc_seq_num();
   send_bootstrap(mac);
 }
 
-void recv_message(int mac, char* msg) {
+/**
+ * Checks if the given seq number is valid for the given mac.
+ * Also updates seq number to the given seq number if valid
+ * @param mac
+ * @param seq_num
+ * @return 1 if is valid, 0 if false
+ */
+int is_valid_seq_number(int mac, int seq_num) {
+  graph_entry* e = get_graph_entry(mac);
+  if (e->mac == mac) {
+    if (e->seq_num < seq_num) {
+      e->seq_num = seq_num;
+      return 1;
+    } else {
+      return 0;
+    }
+  }
+  return 1;
+}
+
+void on_receive_flood(int prev_mac, int orig_mac, int orig_seq_num, int f_type, int mac_1, int mac_2) {
+  if (is_valid_seq_number(orig_mac, orig_seq_num)) {
+    if (f_type == 0) {
+      // create edge
+      add_edge(mac_1, mac_2, orig_seq_num);
+    } else if (f_type == 1) {
+      // remove edge
+      remove_edge(mac_1, mac_2, orig_seq_num);
+    }
+    send_flood(orig_mac, orig_seq_num, f_type, mac_1, mac_2);
+  }
+}
+
+void on_receive_direct(int orig_mac, int orig_seq_num, int dest_mac, char* msg) {
+  if (is_valid_seq_number(orig_mac, orig_seq_num)) {
+    if (dest_mac = module_mac) {
+      recv_handler(orig_mac, msg);
+    } else {
+      send_directed(get_next_hop(dest_mac), orig_mac, orig_seq_num, dest_mac, msg);
+    }
+  }
+}
+
+void on_receive_bootstrap(int prev_mac, char* data) {
 //  TODO
+}
+
+void recv_message(int from_mac, char* msg) {
+  char* type = strp(&msg, ",");
+  if (type[0] == 'F') {
+    int orig_mac = atoi(strp(&msg, ","));
+    int orig_seq_num = atoi(strp(&msg, ","));
+    int f_type = atoi(strp(&msg, ","));
+    int mac_1 = atoi(strp(&msg, ","));
+    int mac_2 = atoi(strp(&msg, ","));
+    on_receive_flood(from_mac, orig_mac, orig_seq_num, f_type, mac_1, mac_2);
+  } else if (type[0] == 'D') {
+    int orig_mac = atoi(strp(&msg, ","));
+    int orig_seq_num = atoi(strp(&msg, ","));
+    int dest_mac = atoi(strp(&msg, ","));
+    on_receive_direct(orig_mac, orig_seq_num, dest_mac, msg);
+  } else if (type[0] == 'B') {
+    on_receive_bootstrap(from_mac, msg);
+  }
 }
 
 int routing_setup() {
