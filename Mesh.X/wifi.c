@@ -49,6 +49,8 @@ int packet_buffer_reader = 0;
 char data_buffers[MAX_DATA_BUFFERS][BUFFER_SIZE];
 int next_max_data_buffer = 0;
 
+static char logbuff[256];
+
 void allocate_packet(enum INFO_TYPE t, int link_id, char* data) {
   packet_buffer[packet_buffer_writer].t = t;
   packet_buffer[packet_buffer_writer].link_id = link_id;
@@ -57,15 +59,19 @@ void allocate_packet(enum INFO_TYPE t, int link_id, char* data) {
     char* new_data_buffer = (char*) data_buffers[next_max_data_buffer];
     next_max_data_buffer = (next_max_data_buffer + 1) % MAX_DATA_BUFFERS;
     strcpy(new_data_buffer, data);
-    
+
     packet_buffer[packet_buffer_writer].data = new_data_buffer;
   }
   packet_buffer_writer = (packet_buffer_writer + 1) % MAX_NUM_INFO_PACKETS;
 }
 
 void process_line(char* line) {
+  sprintf(logbuff, "line: %s", line);
+  comp_log("WIFI_DBG", logbuff);
   int len = strlen(line);
-  if (starts_with(line, len, "+IPD", 4) == 0) {
+  if (starts_with(line, len, "+IPD", 4)) {
+    sprintf(logbuff, "proc data: %s", line);
+    comp_log("WIFI_DBG", logbuff);
     char* tmp = strp(&line, "IPD");
     tmp = strp(&line, ",");
     int link_id = atoi(strp(&line, ","));
@@ -74,10 +80,14 @@ void process_line(char* line) {
     allocate_packet(DATA, link_id, msg);
   } else if (ends_with(line, len, ",CONNECT\r\n", 10)) {
     int link_id = atoi(strp(&line, ","));
-    allocate_packet(DATA, link_id, NULL);
+    sprintf(logbuff, "proc connect: %d", link_id);
+    comp_log("WIFI_DBG", logbuff);
+    allocate_packet(OPENED, link_id, NULL);
   } else if (ends_with(line, len, ",CLOSED\r\n", 9)) {
     int link_id = atoi(strp(&line, ","));
-    allocate_packet(DATA, link_id, NULL);
+    sprintf(logbuff, "proc close: %d", link_id);
+    comp_log("WIFI_DBG", logbuff);
+    allocate_packet(CLOSED, link_id, NULL);
   }
 }
 
@@ -87,9 +97,10 @@ void link_id_disconnected(int link_id) {
     if (mac == connected_ap_mac) {
       connected_ap_mac = 0;
       link_id_to_mac[link_id] = 0;
-      
-      disconnection_handler(mac);
     }
+    
+    if (disconnection_handler != NULL)
+      disconnection_handler(mac);
   }
 }
 
@@ -100,16 +111,19 @@ static char line_buffer[1024];
 void fill_read_buffer() {
   buf_ptr = BUFFER_SIZE;
   most_recent_result = get_esp_data(DEFAULT_TIMEOUT, read_buffer, &buf_ptr);
-  char* tmp = strstr(read_buffer, "\r\n")+2;
+  char* tmp = strstr(read_buffer, "\n")+1;
   char* prev_tmp = read_buffer;
-  while(tmp != (void*) 2) {
+  while(tmp != (void*) 1) {
     strncpy(line_buffer, prev_tmp, (int) (tmp - prev_tmp));
     line_buffer[(int) (tmp - prev_tmp)] = '\0';
+    if (line_buffer[(int) (tmp - prev_tmp) - 1] == '\r') {
+      line_buffer[(int) (tmp - prev_tmp) - 1] = '\0';
+    }
     
     process_line(line_buffer);
     
     prev_tmp = tmp;
-    tmp = strstr(tmp, "\r\n")+2;
+    tmp = strstr(tmp, "\n")+1;
   }
 }
 
@@ -128,23 +142,29 @@ void run_pings() {
 }
 
 void process_data(int link_id, char* type, char* data) {
-  if (strcmp(type, "CS") == 0) {
-    int mac = parse_mac(data);
-    link_id_to_mac[link_id] = mac;
-    
-    ping(link_id);
-    
-    connection_handler(mac);
-  } else if (strcmp(type, "P") == 0) {
-    time_to_ping[link_id] = time_tick_millsec + PING_MS;
-  } else if (strcmp(type, "M") == 0) {
-    recv_handler(link_id_to_mac[link_id], data);
-  }
+    sprintf(logbuff, "proc data: %d %s %s", link_id, type, data);
+    comp_log("WIFI_DBG", logbuff);
+    if (strcmp(type, "CS") == 0) {
+      int mac = parse_mac(data);
+      link_id_to_mac[link_id] = mac;
+
+      ping(link_id);
+
+      if (connection_handler != NULL)
+        connection_handler(mac);
+    } else if (strcmp(type, "P") == 0) {
+      time_to_ping[link_id] = time_tick_millsec + PING_MS;
+    } else if (strcmp(type, "M") == 0) {
+      if (recv_handler != NULL)
+        recv_handler(link_id_to_mac[link_id], data);
+    }
 }
 
 void process_packet_buffer() {
   while(packet_buffer_reader != packet_buffer_writer) {
     information_packet p = packet_buffer[packet_buffer_reader];
+    sprintf(logbuff, "proc packet: %d %d %s", p.t, p.link_id, p.data);
+    comp_log("WIFI_DBG", logbuff);
     if (p.t == CLOSED) {
       link_id_disconnected(p.link_id);
     } else if (p.t == OPENED) {
@@ -152,16 +172,21 @@ void process_packet_buffer() {
       link_id_to_mac[p.link_id] = -1;
     } else if (p.t == DATA) {
       char* next = strchr(p.data, ',');
-      next[0] = '\0';
-      next++;
-      process_data(p.link_id, p.data, next);
+      if (next) {
+        next[0] = '\0';
+        next++;
+        process_data(p.link_id, p.data, next); 
+      }
     }
     
     packet_buffer_reader = (packet_buffer_reader + 1) % MAX_NUM_INFO_PACKETS;
   }
 }
 
-void run() {
+void wifi_run() {
+  // check if any data comes in
+  fill_read_buffer();
+  comp_log("WIFI", read_buffer);
   process_packet_buffer();
   run_pings();
 }
@@ -215,7 +240,7 @@ int wifi_setup(char id) {
   SEND_CMD_OK("AT+CIPSERVER=1,80");
   
   // set ssid (name), pwd, chnl, enc
-  sprintf(cmd_buf, "AT+CWSAP_CUR=\"ESP8266-%d\",\"1234567890\",5,3", id);
+  sprintf(cmd_buf, "AT+CWSAP_CUR=\"ESP8266-Mesh-%d\",\"1234567890\",5,3", id);
   SEND_CMD_OK(cmd_buf);
 }
 
@@ -231,8 +256,6 @@ void wifi_register_sta_connection_handler(void(*handler)(unsigned int sta_mac)) 
   connection_handler = handler;
 }
 
-static char logbuff[256];
-
 /**
  * 
  * @param link_id
@@ -243,7 +266,7 @@ int send_data(int link_id, char* data) {
   sprintf(logbuff, "sending data: %s", data);
   comp_log("WIFI_DBG", logbuff);
   int len = strlen(data);
-  sprintf(cmd_buf, "AT+CIPSEND=%d,%d", link_id, len);
+  sprintf(cmd_buf, "AT+CIPSENDBUF=%d,%d", link_id, len);
   SEND_CMD_OK(cmd_buf);
   
   while(*data != NULL) {
@@ -372,7 +395,7 @@ int* wifi_get_direct_connections() {
   int i;
   int j = 0;
   for (i = 0; i < MAX_CONNECTIONS; i++) {
-    if (link_id_to_mac[i] != 0) {
+    if (link_id_to_mac[i] != 0 && link_id_to_mac[i] != -1) {
       direct_connections[j++] = link_id_to_mac[i];
     }    
   }

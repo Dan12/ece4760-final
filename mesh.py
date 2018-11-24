@@ -6,7 +6,7 @@ import time
 import datetime
 import random
 
-espPat = re.compile("ESP8266-Mesh-\d*\",\d*")
+espPat = re.compile("ESP8266-Mesh-\d*\",-\d*")
 ipRE = re.compile("\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}")
 macRE = re.compile('(?:[0-9a-fA-F]:?){12}')
 
@@ -124,7 +124,7 @@ class WifiModule(threading.Thread):
 		ser = self.ser
 
 		ser.flushInput()
-		self.write_cmd("AT+CIPSEND=" + str(linkId) + "," + str(len(data)) + "\r\n")
+		self.write_cmd("AT+CIPSENDBUF=" + str(linkId) + "," + str(len(data)) + "\r\n")
 
 		ser.write((data).encode())
 		while(1):
@@ -173,7 +173,7 @@ class WifiModule(threading.Thread):
 		try:
 			self.write_cmd("AT+CWJAP_CUR=\"ESP8266-Mesh-{}\",\"1234567890\"".format(apId))
 			linkId = self.get_next_linkId()
-			self.write_cmd("AT+CIPSTART={},\"TCP\",\"192.168.{}.1\",80".format(linkId, apI))
+			self.write_cmd("AT+CIPSTART={},\"TCP\",\"192.168.{}.1\",80".format(linkId, apId))
 
 			# get connection ip
 			result = safe_dec(self.write_cmd("AT+CIFSR")).split("\r\n")
@@ -182,7 +182,7 @@ class WifiModule(threading.Thread):
 					ip = ipRE.findall(result_line)[0]
 			if ip and self.mac:
 				# send the AP your information
-				self.write_data(linkId, "CS,{},{}\n".format(self.mac, ip))
+				self.write_data(linkId, "CS,{}\n".format(self.mac))
 
 			return True
 		except Exception as e:
@@ -252,12 +252,12 @@ class WifiModule(threading.Thread):
 		# time.sleep((self.id-1)*10)
 		self.iprint("Running module thread {} on port {}".format(self.id, self.port))
 		self.setup()
-		# conns = self.get_connections()
-		# print(conns)
-		# for (ssid, rssi) in conns:
-		# 	connId = ssid[len("ESP8266-Mesh-"):]
-		# 	if self.connect_to_ap(connId):
-		# 		break
+		conns = self.get_connections()
+		print(conns)
+		for (ssid, rssi) in conns:
+			connId = ssid[len("ESP8266-Mesh-"):]
+			if self.connect_to_ap(connId):
+				break
 		self.broadcast_ap()
 		ser = self.ser
 		while(True):
@@ -276,7 +276,8 @@ class WifiModule(threading.Thread):
 			# 	self.to_ping.append(elt)
 
 id = 2
-for port in glob.glob("/dev/cu.SLAB_USBtoUART7*"):
-	module = WifiModule(port,id)
-	module.start()
-	id+=1
+for port in glob.glob("/dev/cu.SLAB_USBtoUART*"):
+	if port != "/dev/cu.SLAB_USBtoUART":
+		module = WifiModule(port,id)
+		module.start()
+		id+=1

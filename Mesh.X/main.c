@@ -28,6 +28,18 @@
 
 #define DEVICE_ID 1
 
+void dis_h(int mac) {
+  comp_log("APP", "diconnection");
+}
+
+void con_h(int mac) {
+  comp_log("APP", "connection");
+}
+
+void recv_h(int mac, char* msg) {
+  comp_log("APP", msg);
+}
+
 int main(void) {
   
   init_system();
@@ -46,19 +58,12 @@ int main(void) {
     // TODO reset
   }
   
+  wifi_register_sta_connection_handler(con_h);
+  wifi_register_direct_disconnection_handler(dis_h);
+  wifi_register_recv_handler(recv_h);
+
   while(1) {
-    comp_log("APP", "getting vis macs");
-    visible_mac* vis_macs = wifi_get_visible_macs();
-    int i = 0;
-    while(vis_macs[i].mac != 0) {
-      comp_log("APP", vis_macs[i].ssid);
-      wifi_connect_to_ap(vis_macs[i].mac);
-      break;
-//      i++;
-    }
-    // constant read loop
-//    most_recent_result = get_data_dma(DEFAULT_TIMEOUT, "\r\n", 0, read_buffer, &buf_ptr);
-//    echo_buff();
+    wifi_run();
   }
 }
 

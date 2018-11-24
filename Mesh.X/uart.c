@@ -78,21 +78,24 @@ int get_esp_data(int timeout, char* ret_buf, int* len) {
       ret_buf[(*len)++] = character;
 
       // check for successful termination
-      if (ends_with(ret_buf, *len, "OK\r\n", 4) == 0) {
+      if (ends_with(ret_buf, *len, "OK\r\n", 4)) {
         ret_buf[*len] = '\0';
         return 1;
       }
       // check for error termination
-      if (ends_with(ret_buf, *len, "ERROR\r\n", 7) == 0) {
+      if (ends_with(ret_buf, *len, "ERROR\r\n", 7)) {
+        ret_buf[*len] = '\0';
         return 0;
       }
       
       // check for overrun
       if (*len == buf_len) {
+        ret_buf[(*len) - 1] = '\0';
         return 0;
       }
     }
     if (time_tick_millsec - start_time > timeout) {
+      ret_buf[*len] = '\0';
       return 0;
     }
   }

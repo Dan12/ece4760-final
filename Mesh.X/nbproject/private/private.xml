@@ -5,11 +5,10 @@
         <group>
             <file>file:/Users/dantech/Desktop/CollegeStuff/sem5/ece4760/final/Mesh.X/wifi.c</file>
             <file>file:/Users/dantech/Desktop/CollegeStuff/sem5/ece4760/final/Mesh.X/system.h</file>
-            <file>file:/Users/dantech/Desktop/CollegeStuff/sem5/ece4760/final/Mesh.X/uart.c</file>
             <file>file:/Users/dantech/Desktop/CollegeStuff/sem5/ece4760/final/Mesh.X/main.c</file>
             <file>file:/Users/dantech/Desktop/CollegeStuff/sem5/ece4760/final/Mesh.X/wifi.h</file>
-            <file>file:/Users/dantech/Desktop/CollegeStuff/sem5/ece4760/final/Mesh.X/logger.h</file>
             <file>file:/Users/dantech/Desktop/CollegeStuff/sem5/ece4760/final/Mesh.X/uart.h</file>
+            <file>file:/Users/dantech/Desktop/CollegeStuff/sem5/ece4760/final/Mesh.X/timer.c</file>
             <file>file:/Users/dantech/Desktop/CollegeStuff/sem5/ece4760/final/Mesh.X/string_util.c</file>
         </group>
     </open-files>
