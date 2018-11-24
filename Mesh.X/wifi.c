@@ -17,13 +17,9 @@ static int connected_ap_mac = 0;
 #define PING_MS_STR "5000"
 static int time_to_ping[MAX_CONNECTIONS];
 
+// null terminated data structure to cache visible macs
 #define MAX_VISIBLE_MACS 10
 static visible_mac visible_macs[MAX_VISIBLE_MACS];
-
-#define BUFFER_SIZE 1024
-static char read_buffer[BUFFER_SIZE];
-static int buf_ptr = 0;
-static int most_recent_result = 0;
 
 enum INFO_TYPE {
   DATA,
@@ -62,17 +58,17 @@ void allocate_packet(enum INFO_TYPE t, int link_id, char* data) {
 void process_line(char* line) {
   int len = strlen(line);
   if (starts_with(line, len, "+IPD", 4) == 0) {
-    char* tmp = strtok(line, "IPD");
-    tmp = strtok(NULL, ",");
-    int link_id = atoi(strtok(NULL, ","));
-    int len = atoi(strtok(NULL, ":"));
-    char* msg = strtok(NULL, "\n");
+    char* tmp = strp(&line, "IPD");
+    tmp = strp(&line, ",");
+    int link_id = atoi(strp(&line, ","));
+    int len = atoi(strp(&line, ":"));
+    char* msg = strp(&line, "\n");
     allocate_packet(DATA, link_id, msg);
   } else if (ends_with(line, len, ",CONNECT\r\n", 10)) {
-    int link_id = atoi(strtok(line, ","));
+    int link_id = atoi(strp(&line, ","));
     allocate_packet(DATA, link_id, NULL);
   } else if (ends_with(line, len, ",CLOSED\r\n", 9)) {
-    int link_id = atoi(strtok(line, ","));
+    int link_id = atoi(strp(&line, ","));
     allocate_packet(DATA, link_id, NULL);
   }
 }
@@ -89,8 +85,33 @@ void link_id_disconnected(int link_id) {
   }
 }
 
+// buffer for reading the data from the serial layer
+#define BUFFER_SIZE 1024
+static char read_buffer[BUFFER_SIZE];
+static int buf_ptr = 0;
+static int most_recent_result = 0;
+
+/**
+ * Fills the read buffer and does some line processing
+ */
+void fill_read_buffer() {
+  buf_ptr = BUFFER_SIZE;
+  most_recent_result = get_esp_data(DEFAULT_TIMEOUT, read_buffer, &buf_ptr);
+  
+}
+
 void ping(int link_id) {
   send_data(link_id, "P," PING_MS_STR);
+}
+
+void run_pings() {
+  static int i;
+  for (i = 0; i < MAX_CONNECTIONS; i++) {
+    if (time_to_ping[i] != 0 && time_to_ping[i] < time_tick_millsec) {
+      time_to_ping[i] = 0;
+      ping(i);
+    }
+  }
 }
 
 void process_data(int link_id, char* type, char* data) {
@@ -127,12 +148,17 @@ void process_packet_buffer() {
   }
 }
 
+void run() {
+  process_packet_buffer();
+  run_pings();
+}
+
 static char cmd_buf[256];
 
 #define SEND_CMD_OK(cmd) \
 send_cmd(cmd, UART_ESP); \
 buf_ptr = BUFFER_SIZE; \
-most_recent_result = get_data_dma(DEFAULT_TIMEOUT, "OK\r\n", 0, read_buffer, &buf_ptr); \
+most_recent_result = get_esp_data(DEFAULT_TIMEOUT, read_buffer, &buf_ptr); \
 if (!most_recent_result) return 0;
 
 int wifi_setup(char id) {
@@ -158,9 +184,9 @@ int wifi_setup(char id) {
   
   // set to Soft AP + Station mode
   SEND_CMD_OK("AT+CIPAPMAC_CUR?");
-  char* tmp = strtok(read_buffer, "CIPAPMAC_CUR");
-  tmp = strtok(NULL, "\"");
-  char* mac = strtok(NULL, "\"");
+  char* tmp = strp(&read_buffer, "CIPAPMAC_CUR");
+  tmp = strp(&read_buffer, "\"");
+  char* mac = strp(&read_buffer, "\"");
   module_mac = parse_mac(mac);
   
   // set local IP address to a different number
@@ -206,7 +232,7 @@ int send_data(int link_id, char* data) {
   }
   
   buf_ptr = BUFFER_SIZE;
-  most_recent_result = get_data_dma(DEFAULT_TIMEOUT, "OK\r\n", 0, read_buffer, &buf_ptr);
+  most_recent_result = get_esp_data(DEFAULT_TIMEOUT, read_buffer, &buf_ptr);
   if (!most_recent_result) return 0;
   
   return 1;
@@ -305,7 +331,7 @@ void wifi_disconnect_from_ap() {
     if (link_id_to_close != -1) {
       send_cmd("AT+CIPCLOSE", UART_ESP); 
       buf_ptr = BUFFER_SIZE;
-      most_recent_result = get_data_dma(DEFAULT_TIMEOUT, "OK\r\n", 0, read_buffer, &buf_ptr);
+      most_recent_result = get_esp_data(DEFAULT_TIMEOUT, read_buffer, &buf_ptr);
       if (most_recent_result == 0) {
         int disconnected_mac = connected_ap_mac;
         connected_ap_mac = 0;
@@ -343,11 +369,11 @@ int* wifi_get_direct_connections() {
 
 int parse_mac(char* mac) {
   int result = 0;
-  char* tmp = strtok(mac, ":");
+  char* tmp = strp(&mac, ":");
   while(tmp != NULL) {
     result <<= 8;
     result |= (int) strtol(tmp, NULL, 16);
-    tmp = strtok(NULL, ":");
+    tmp = strp(&mac, ":");
   }
   return result;
 }
@@ -355,25 +381,29 @@ int parse_mac(char* mac) {
 visible_mac* wifi_get_visible_macs() {
   send_cmd("AT+CWLAP", UART_ESP);
   buf_ptr = BUFFER_SIZE;
-  most_recent_result = get_data_dma(DEFAULT_TIMEOUT, "OK\r\n", 0, read_buffer, &buf_ptr);
+  most_recent_result = get_esp_data(DEFAULT_TIMEOUT, read_buffer, &buf_ptr);
   
-  char* tmp = strtok(read_buffer, "CWLAP");
+  char* tmp = strp(&read_buffer, "CWLAP");
+  tmp = strp(&read_buffer, "\"");
   static int i = 0;
   while(tmp != NULL) {
-    send_cmd(tmp, UART_COMP);
-    tmp = strtok(NULL, ",");
-    char* ssid = strtok(NULL, "\"");
+    char* ssid = strp(&read_buffer, "\"");
     if (starts_with(ssid, strlen(ssid), "ESP8266", 7) == 0) {
       strcpy(visible_macs[i].ssid, ssid);
-      char* rssi = strtok(NULL, ",");
+      
+      tmp = strp(&read_buffer, ",");
+      char* rssi = strp(&read_buffer, ",");
       visible_macs[i].strength = -atoi(rssi);
-      char* mac = strtok(NULL, "\"");
+      
+      tmp = strp(&read_buffer, "\"");
+      char* mac = strp(&read_buffer, "\"");
       visible_macs[i].mac = parse_mac(mac);
       
       i++;
       if (i >= MAX_VISIBLE_MACS-1) break;
     }
-    tmp = strtok(NULL, "CWLAP");
+    tmp = strp(&read_buffer, "CWLAP");
+    tmp = strp(&read_buffer, "\"");
   }
   for (; i < MAX_VISIBLE_MACS; i++) {
     visible_macs[i].mac = 0;

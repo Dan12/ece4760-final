@@ -22,39 +22,28 @@ void send_byte(char b, UART_MODULE m) {
   UARTSendDataByte(m, b);
 }
 
-/**
- * 
- * @param timeout
- * @return 1 if success, 0 otherwise
- */
-// TODO handle ERROR and return
-int get_data(int timeout, UART_MODULE m, char* term, int echo, char* ret_buf, int* len) {
+int get_comp_data(int timeout, char* ret_buf, int* len) {
   static int start_time;
   start_time = time_tick_millsec;
   
-  int term_len = strlen(term);
   int buf_len = *len;
   *len = 0;
   while(1) {
-    if(UARTReceivedDataIsAvailable(m)) {
+    if(UARTReceivedDataIsAvailable(UART_COMP)) {
       // reset timeout when we get a character
       start_time = time_tick_millsec;
       
       // read the character
-      char character = UARTGetDataByte(m);
+      char character = UARTGetDataByte(UART_COMP);
       // put it in the buffer
       ret_buf[(*len)++] = character;
       
-      if (echo == 1) {
-        // echo the character to the screen
-        send_byte(character, m);
-      }
+      // echo the character to the screen
+      send_byte(character, UART_COMP);
       
       // check for termination
-      if (ends_with(ret_buf, *len, term, term_len) == 0) {
-        if (echo == 1 && m == UART_COMP) {
-          send_byte('\n', m);
-        }
+      if (character == '\r') {
+        send_byte('\n', UART_COMP);
         ret_buf[*len] = '\0';
         return 1;
       }
@@ -70,11 +59,10 @@ int get_data(int timeout, UART_MODULE m, char* term, int echo, char* ret_buf, in
   }
 }
 
-int get_data_dma(int timeout, char* term, int echo, char* ret_buf, int* len) {
+int get_esp_data(int timeout, char* ret_buf, int* len) {
   static int start_time;
   start_time = time_tick_millsec;
   
-  int term_len = strlen(term);
   int buf_len = *len;
   *len = 0;
   while(1) {
@@ -88,19 +76,15 @@ int get_data_dma(int timeout, char* term, int echo, char* ret_buf, int* len) {
       
       // put it in the buffer
       ret_buf[(*len)++] = character;
-      
-      if (echo == 1) {
-        // echo the character to the screen
-        send_byte(character, dma_uart_chnl);
-      }
-      
-      // check for termination
-      if (ends_with(ret_buf, *len, term, term_len) == 0) {
-        if (echo == 1 && dma_uart_chnl == UART_COMP) {
-          send_byte('\n', dma_uart_chnl);
-        }
+
+      // check for successful termination
+      if (ends_with(ret_buf, *len, "OK\r\n", 4) == 0) {
         ret_buf[*len] = '\0';
         return 1;
+      }
+      // check for error termination
+      if (ends_with(ret_buf, *len, "ERROR\r\n", 7) == 0) {
+        return 0;
       }
       
       // check for overrun

@@ -20,9 +20,9 @@ static UART_MODULE dma_uart_chnl = UART_ESP;
 // 5 seconds
 #define DEFAULT_TIMEOUT 5000
 
-int get_data(int timeout, UART_MODULE m, char* term, int echo, char* ret_buf, int* len);
+int get_comp_data(int timeout, char* ret_buf, int* len);
 
-int get_data_dma(int timeout, char* term, int echo, char* ret_buf, int* len);
+int get_esp_data(int timeout, char* ret_buf, int* len);
 
 void send_byte(char b, UART_MODULE m);
 

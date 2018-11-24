@@ -1,4 +1,5 @@
 #include "string_util.h"
+#include <stdlib.h>
 
 /**
  * 
@@ -32,4 +33,28 @@ int starts_with(char* str, int str_len, char* pre, int pre_len) {
     return 1;
   }
   return strncmp(pre, str, pre_len);
+}
+
+/**
+ * Splits the string pointed to by str by the first instance of delim.
+ * Returns the first split and updates str to point to the second split
+ * @param str
+ * @param delim
+ * @return 
+ */
+char* strp(char** str, char* delim) {
+  if (*str == NULL) {
+    return NULL;
+  }
+  char* tmp = strstr(*str, delim);
+  if (tmp == NULL) {
+    char* ret = *str;
+    *str = NULL;
+    return ret;
+  }
+  tmp[0] = '\0';
+  tmp += strlen(delim);
+  char* ret = *str;
+  *str = tmp;
+  return ret;
 }

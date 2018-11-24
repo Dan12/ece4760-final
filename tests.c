@@ -2,17 +2,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-int parse_mac(char* mac) {
-  int result = 0;
-  char* tmp = strtok(mac, ":");
-  while(tmp != NULL) {
-    result <<= 8;
-    result |= (int) strtol(tmp, NULL, 16);
-    tmp = strtok(NULL, ":");
-  }
-  return result;
-}
-
 int ends_with(char* buf, int buf_len, char* term, int term_len) {
   int i;
   int ti = term_len-1;
@@ -31,57 +20,99 @@ int starts_with(char* str, int str_len, char* pre, int pre_len) {
   return strncmp(pre, str, pre_len);
 }
 
+char* strp(char** str, char* delim) {
+  if (*str == NULL) {
+    return NULL;
+  }
+  char* tmp = strstr(*str, delim);
+  if (tmp == NULL) {
+    char* ret = *str;
+    *str = NULL;
+    return ret;
+  }
+  tmp[0] = '\0';
+  tmp += strlen(delim);
+  char* ret = *str;
+  *str = tmp;
+  return ret;
+}
+
+int parse_mac(char* mac) {
+  int result = 0;
+  char* tmp = strp(&mac, ":");
+  while(tmp != NULL) {
+    result <<= 8;
+    result |= (int) strtol(tmp, NULL, 16);
+    tmp = strp(&mac, ":");
+  }
+  return result;
+}
+
 int main(void) {
 
-  char str[] = "+CWLAP:(3,\"ESP8266-Mesh-2\",-6,\"86:f3:eb:59:c2:ca\",1,25,-120,5,3,3,0)";
-  printf("Hello: %s\n", str);
-  char* tmp = strtok(str, "CWLAP");
+  char str[] = "+CWLAP:(3,\"ESP8266-Mesh-2\",-6,\"86:f3:eb:59:c2:ca\",1,25,-120,5,3,3,0)\r\n+IPD,0,62:M#F,86:f3:eb:59:c2:ca,2,0,1a:fe:34:a0:75:e1,86:f3:eb:59:c2:ca\n\r\n+CWLAP:(1,\"ESP8266-Mesh-4\",-6,\"86:f3:eb:59:c2:ca\",1,25,-120,5,3,3,0)\r\n";
+  char* str_i = str;
+  // printf("Hello: %s\n", str);
+  char* tmp = strp(&str_i, "CWLAP");
   printf("T: %s\n", tmp);
-  tmp = strtok(NULL, ",");
-  printf("T: %s\n", tmp);
-  char* ssid = strtok(NULL, "\"");
+  tmp = strp(&str_i, "\"");
+  char* ssid = strp(&str_i, "\"");
   printf("T: %s\n", ssid);
   printf("SSID: %s\n", starts_with(ssid, strlen(ssid), "ESP8266", 7) == 0 ? "true" : "false");
-  char* rssi = strtok(NULL, ",");
+  tmp = strp(&str_i, ",");
+  char* rssi = strp(&str_i, ",");
   printf("T: %d\n", -atoi(rssi));
-  char* mac = strtok(NULL, "\"");
+  tmp = strp(&str_i, "\"");
+  char* mac = strp(&str_i, "\"");
   printf("T: %d\n", parse_mac(mac));
-  tmp = strtok(NULL, "CWLAP");
+  tmp = strp(&str_i, "CWLAP");
+  tmp = strp(&str_i, "\"");
+  printf("T: %s\n", tmp);
+  ssid = strp(&str_i, "\"");
+  printf("T: %s\n", ssid);
+  printf("SSID: %s\n", starts_with(ssid, strlen(ssid), "ESP8266", 7) == 0 ? "true" : "false");
+  tmp = strp(&str_i, ",");
+  rssi = strp(&str_i, ",");
+  printf("T: %d\n", -atoi(rssi));
+  tmp = strp(&str_i, "\"");
+  mac = strp(&str_i, "\"");
+  printf("T: %d\n", parse_mac(mac));
+  tmp = strp(&str_i, "CWLAP");
+  tmp = strp(&str_i, "\"");
   printf("T: %s\n", tmp);
 
   char str2[] = "+IPD,0,62:M#F,86:f3:eb:59:c2:ca,2,0,1a:fe:34:a0:75:e1,86:f3:eb:59:c2:ca\n'";
-  printf("Hello: %s\n", str2);
-  tmp = strtok(str2, "IPD");
+  char* str2_i = str2;
+  tmp = strp(&str2_i, "IPD");
   printf("T: %s\n", tmp);
-  tmp = strtok(NULL, ",");
-  printf("T: %s\n", tmp);
-  char* link_id = strtok(NULL, ",");
+  tmp = strp(&str2_i, ",");
+  char* link_id = strp(&str2_i, ",");
   printf("T: %d\n", atoi(link_id));
-  char* len = strtok(NULL, ":");
+  char* len = strp(&str2_i, ":");
   printf("T: %d\n", atoi(len));
-  char* msg = strtok(NULL, "\n");
+  char* msg = strp(&str2_i, "\n");
   printf("T: %s\n", msg);
 
   char str3[] = "+CIPAPMAC_CUR:\"1a:fe:34:a0:75:e1\"\r\n";
-  printf("Hello: %s\n", str3);
-  tmp = strtok(str3, "CIPAPMAC_CUR");
+  char* str3_i = str3;
+  tmp = strp(&str3_i, "CIPAPMAC_CUR");
   printf("T: %s\n", tmp);
-  tmp = strtok(NULL, "\"");
+  tmp = strp(&str3_i, "\"");
   printf("T: %s\n", tmp);
-  tmp = strtok(NULL, "\"");
+  tmp = strp(&str3_i, "\"");
   printf("T: %s\n", tmp);
 
   printf("Result: %s\n", (!0) ? "true" : "false");
 
-  char str4[] = "CS,4,111";
-  // printf("Hello: %s\n", );
-  char* next = strchr(str4, ',');
-  next[0] = '\0';
-  next++;
-  // tmp = strtok(str3, "CIPAPMAC_CUR");
-  printf("T: %s\n", str4);
-  // tmp = strtok(NULL, "\"");
-  printf("T: %s\n", next);
+  // char str4[] = "CS,4,111";
+  // // printf("Hello: %s\n", );
+  // char* next = strchr(str4, ',');
+  // next[0] = '\0';
+  // next++;
+  // // tmp = strtok(str3, "CIPAPMAC_CUR");
+  // printf("T: %s\n", str4);
+  // // tmp = strtok(NULL, "\"");
+  // printf("T: %s\n", next);
 
   return 0;
 }

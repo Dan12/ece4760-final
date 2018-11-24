@@ -19,6 +19,12 @@ static int module_mac;
 int wifi_setup(char id);
 
 /**
+ * Run post processing algorithms to maintain state. Should be run as often
+ * as possible
+ */
+void run();
+
+/**
  * Register a handler for when the wifi module receives a message
  * @param handler
  */
