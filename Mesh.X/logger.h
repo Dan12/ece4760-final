@@ -11,7 +11,7 @@
 #include "uart.h"
 
 static char log_buff[1024];
-static void log(char* layer, char* msg) {
+static void comp_log(char* layer, char* msg) {
     sprintf(log_buff, "%s: %s", layer, msg);
     send_cmd(log_buff, UART_COMP);
 }

@@ -23,7 +23,7 @@ void send_byte(char b, UART_MODULE m) {
 }
 
 int get_comp_data(int timeout, char* ret_buf, int* len) {
-  static int start_time;
+  int start_time;
   start_time = time_tick_millsec;
   
   int buf_len = *len;
@@ -60,7 +60,7 @@ int get_comp_data(int timeout, char* ret_buf, int* len) {
 }
 
 int get_esp_data(int timeout, char* ret_buf, int* len) {
-  static int start_time;
+  int start_time;
   start_time = time_tick_millsec;
   
   int buf_len = *len;

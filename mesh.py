@@ -197,11 +197,12 @@ class WifiModule(threading.Thread):
 		print(packets)
 		# connection confirmation from station
 		if packets[0] == "CS":
-			self.add_conn(0, linkId, packets[1], packets[2])
+			# self.add_conn(0, linkId, packets[1], packets[2])
 			# self.write_cmd("AT+CWLIF")
 			# newline packet to allow connection to settle
-			self.write_data(linkId, "\n")
-			self.write_data(linkId, "CA,{},{}\n".format(self.mac, self.ip))
+			# self.write_data(linkId, "\n")
+			# self.write_data(linkId, "CA,{},{}\n".format(self.mac, self.ip))
+			print(packets)
 		# connection confirmation from AP
 		elif packets[0] == "CA":
 			self.add_conn(1, linkId, packets[1], packets[2])
@@ -248,15 +249,15 @@ class WifiModule(threading.Thread):
 		# 	if safe_dec(line).startswith("ready"):
 		# 		break
 
-		time.sleep((self.id-1)*10)
+		# time.sleep((self.id-1)*10)
 		self.iprint("Running module thread {} on port {}".format(self.id, self.port))
 		self.setup()
-		conns = self.get_connections()
-		print(conns)
-		for (ssid, rssi) in conns:
-			connId = ssid[len("ESP8266-Mesh-"):]
-			if self.connect_to_ap(connId):
-				break
+		# conns = self.get_connections()
+		# print(conns)
+		# for (ssid, rssi) in conns:
+		# 	connId = ssid[len("ESP8266-Mesh-"):]
+		# 	if self.connect_to_ap(connId):
+		# 		break
 		self.broadcast_ap()
 		ser = self.ser
 		while(True):
@@ -264,18 +265,18 @@ class WifiModule(threading.Thread):
 			self.iprint("Read bytes: %s" % line)
 
 			# figure out if I have to ping someone
-			too_early = []
-			while self.to_ping:
-				(toPingLink, timeToPing) = self.to_ping.pop()
-				if timeToPing < datetime.datetime.now().timestamp():
-					self.ping(toPingLink)
-				else:
-					too_early.append((toPingLink, timeToPing))
-			for elt in too_early:
-				self.to_ping.append(elt)
+			# too_early = []
+			# while self.to_ping:
+			# 	(toPingLink, timeToPing) = self.to_ping.pop()
+			# 	if timeToPing < datetime.datetime.now().timestamp():
+			# 		self.ping(toPingLink)
+			# 	else:
+			# 		too_early.append((toPingLink, timeToPing))
+			# for elt in too_early:
+			# 	self.to_ping.append(elt)
 
-id = 1
-for port in glob.glob("/dev/cu.SLAB_USBtoUART*"):
+id = 2
+for port in glob.glob("/dev/cu.SLAB_USBtoUART7*"):
 	module = WifiModule(port,id)
 	module.start()
 	id+=1

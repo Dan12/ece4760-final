@@ -24,6 +24,7 @@
 #include "string_util.h"
 
 #include "wifi.h"
+#include "logger.h"
 
 #define DEVICE_ID 1
 
@@ -35,15 +36,26 @@ int main(void) {
 
   INTEnableSystemMultiVectoredInt();
   
-  if (wifi_setup(DEVICE_ID) == 0) {
-    send_cmd("Successfully finished setup", UART_COMP); 
+  comp_log("APP", "starting system");
+  
+  if (wifi_setup(DEVICE_ID)) {
+    comp_log("APP", "successfully finished setup");
   } else {
-    send_cmd("Setup failed", UART_COMP); 
+    comp_log("APP", "failed setup");
     
     // TODO reset
   }
   
   while(1) {
+    comp_log("APP", "getting vis macs");
+    visible_mac* vis_macs = wifi_get_visible_macs();
+    int i = 0;
+    while(vis_macs[i].mac != 0) {
+      comp_log("APP", vis_macs[i].ssid);
+      wifi_connect_to_ap(vis_macs[i].mac);
+      break;
+//      i++;
+    }
     // constant read loop
 //    most_recent_result = get_data_dma(DEFAULT_TIMEOUT, "\r\n", 0, read_buffer, &buf_ptr);
 //    echo_buff();

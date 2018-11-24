@@ -2,6 +2,7 @@
 #include "uart.h"
 #include "string_util.h"
 #include "timer.h"
+#include "logger.h"
 
 static void(*recv_handler)(unsigned int mac, char* msg);
 static void(*disconnection_handler)(unsigned int mac);
@@ -101,8 +102,8 @@ void fill_read_buffer() {
   most_recent_result = get_esp_data(DEFAULT_TIMEOUT, read_buffer, &buf_ptr);
   char* tmp = strstr(read_buffer, "\r\n")+2;
   char* prev_tmp = read_buffer;
-  while(tmp != NULL) {
-    strncpy(line_buffer, read_buffer, (int) (tmp - prev_tmp));
+  while(tmp != (void*) 2) {
+    strncpy(line_buffer, prev_tmp, (int) (tmp - prev_tmp));
     line_buffer[(int) (tmp - prev_tmp)] = '\0';
     
     process_line(line_buffer);
@@ -117,7 +118,7 @@ void ping(int link_id) {
 }
 
 void run_pings() {
-  static int i;
+  int i;
   for (i = 0; i < MAX_CONNECTIONS; i++) {
     if (time_to_ping[i] != 0 && time_to_ping[i] < time_tick_millsec) {
       time_to_ping[i] = 0;
@@ -166,15 +167,17 @@ void run() {
 }
 
 static char cmd_buf[256];
+static char data_buf[1024];
 
 #define SEND_CMD_OK(cmd) \
 send_cmd(cmd, UART_ESP); \
 fill_read_buffer(); \
+comp_log("WIFI", read_buffer); \
 if (!most_recent_result) return 0;
 
 int wifi_setup(char id) {
   // reset buffers
-  static int i;
+  int i;
   for(i = 0; i < MAX_CONNECTIONS; i++) {
     link_id_to_mac[i] = 0;
     time_to_ping[i] = 0;
@@ -195,9 +198,10 @@ int wifi_setup(char id) {
   
   // set to Soft AP + Station mode
   SEND_CMD_OK("AT+CIPAPMAC_CUR?");
-  char* tmp = strp(&read_buffer, "CIPAPMAC_CUR");
-  tmp = strp(&read_buffer, "\"");
-  char* mac = strp(&read_buffer, "\"");
+  char* str = read_buffer;
+  char* tmp = strp(&str, "CIPAPMAC_CUR:");
+  tmp = strp(&str, "\"");
+  char* mac = strp(&str, "\"");
   module_mac = parse_mac(mac);
   
   // set local IP address to a different number
@@ -227,6 +231,8 @@ void wifi_register_sta_connection_handler(void(*handler)(unsigned int sta_mac)) 
   connection_handler = handler;
 }
 
+static char logbuff[256];
+
 /**
  * 
  * @param link_id
@@ -234,6 +240,8 @@ void wifi_register_sta_connection_handler(void(*handler)(unsigned int sta_mac)) 
  * @return Return 1 if success, 0 if failure
  */
 int send_data(int link_id, char* data) {
+  sprintf(logbuff, "sending data: %s", data);
+  comp_log("WIFI_DBG", logbuff);
   int len = strlen(data);
   sprintf(cmd_buf, "AT+CIPSEND=%d,%d", link_id, len);
   SEND_CMD_OK(cmd_buf);
@@ -254,7 +262,7 @@ int send_data(int link_id, char* data) {
  * @return the link id for this mac, or -1 if no corresponding link_id
  */
 int mac_to_link_id(int mac) {
-  static int i;
+  int i;
   int link_id = -1;
   for (i = 0; i < MAX_CONNECTIONS; i++) {
     if (link_id_to_mac[i] == mac) {
@@ -274,7 +282,7 @@ int mac_to_link_id(int mac) {
 int wifi_send_data(int dest_mac, char* msg) {
   int link_id_to_send = mac_to_link_id(dest_mac);
   if (link_id_to_send != -1) {
-    if (send_data(link_id_to_send, msg) == 1) {
+    if (send_data(link_id_to_send, msg)) {
       // succeeded in sending data
       return 1;
     }
@@ -283,7 +291,7 @@ int wifi_send_data(int dest_mac, char* msg) {
 }
 
 char* get_visible_ssid(int mac) {
-  static int i = 0;
+  int i = 0;
   while(visible_macs[i].mac != 0) {
     if (visible_macs[i].mac == mac) {
       return visible_macs[i].ssid;
@@ -297,9 +305,9 @@ char* get_visible_ssid(int mac) {
  * @return next unused link id or -1 if no unused link available
  */
 int get_next_link_id() {
-  static int i;
+  int i;
   for (i = 0; i < MAX_CONNECTIONS; i++) {
-    if (link_id_to_mac[i] != 0) {
+    if (link_id_to_mac[i] == 0) {
       return i;
     }
   }
@@ -320,8 +328,8 @@ int wifi_connect_to_ap(int ap_mac) {
       SEND_CMD_OK(cmd_buf);
       
       // send the AP your information
-      sprintf(cmd_buf, "CS,%d", module_mac);
-      if (send_data(link_id, cmd_buf) == 1) {
+      sprintf(data_buf, "CS,%d\n", module_mac);
+      if (send_data(link_id, data_buf)) {
         link_id_to_mac[link_id] = ap_mac;
         connected_ap_mac = ap_mac;
         return 1;
@@ -361,8 +369,8 @@ int wifi_get_connected_ap() {
 static int direct_connections[MAX_CONNECTIONS+1];
 
 int* wifi_get_direct_connections() {
-  static int i;
-  static int j = 0;
+  int i;
+  int j = 0;
   for (i = 0; i < MAX_CONNECTIONS; i++) {
     if (link_id_to_mac[i] != 0) {
       direct_connections[j++] = link_id_to_mac[i];
@@ -390,28 +398,31 @@ int parse_mac(char* mac) {
 visible_mac* wifi_get_visible_macs() {
   send_cmd("AT+CWLAP", UART_ESP);
   fill_read_buffer();
+  comp_log("WIFI", read_buffer);
   
-  char* tmp = strp(&read_buffer, "CWLAP");
-  tmp = strp(&read_buffer, "\"");
-  static int i = 0;
-  while(tmp != NULL) {
-    char* ssid = strp(&read_buffer, "\"");
+  char* str = read_buffer;
+  
+  char* tmp = strp(&str, "CWLAP:");
+  tmp = strp(&str, "\"");
+  int i = 0;
+  while(tmp != NULL && most_recent_result) {
+    char* ssid = strp(&str, "\"");
     if (starts_with(ssid, strlen(ssid), "ESP8266", 7) == 0) {
       strcpy(visible_macs[i].ssid, ssid);
       
-      tmp = strp(&read_buffer, ",");
-      char* rssi = strp(&read_buffer, ",");
+      tmp = strp(&str, ",");
+      char* rssi = strp(&str, ",");
       visible_macs[i].strength = -atoi(rssi);
       
-      tmp = strp(&read_buffer, "\"");
-      char* mac = strp(&read_buffer, "\"");
+      tmp = strp(&str, "\"");
+      char* mac = strp(&str, "\"");
       visible_macs[i].mac = parse_mac(mac);
       
       i++;
       if (i >= MAX_VISIBLE_MACS-1) break;
     }
-    tmp = strp(&read_buffer, "CWLAP");
-    tmp = strp(&read_buffer, "\"");
+    tmp = strp(&str, "CWLAP:");
+    tmp = strp(&str, "\"");
   }
   for (; i < MAX_VISIBLE_MACS; i++) {
     visible_macs[i].mac = 0;
