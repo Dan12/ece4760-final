@@ -310,7 +310,73 @@ void on_receive_direct(int orig_mac, int orig_seq_num, int dest_mac, char* msg) 
 }
 
 void on_receive_bootstrap(int prev_mac, char* data) {
-//  TODO
+  get_station_connections();
+  station_connection my_side[MAX_NUM_NODES];
+  int my_side_head = 0;
+  int my_side_in_other[MAX_NUM_NODES];
+  int i;
+  for (i = 0; i < MAX_NUM_NODES; i++) {
+    my_side_in_other[i] = 0;
+  }
+  station_connection other_side[MAX_NUM_NODES];
+  int other_side_head = 0;
+  
+  while(data) {
+    int sta_mac = atoi(strp(&data, ","));
+    int sta_seq_num = atoi(strp(&data, ","));
+    int ap_mac = atoi(strp(&data, ","));
+    
+    int found_conn = 0;
+    // check if this connection exists on my side
+    for (i = 0; i < MAX_NUM_NODES; i++) {
+      station_connection s = station_connections[i];
+      if (s.ap_mac == ap_mac && s.sta_mac == sta_mac) {
+        if (s.sta_seq_num < sta_seq_num) {
+          // the connection is fresher on the other side
+          other_side[other_side_head].sta_mac = sta_mac;
+          other_side[other_side_head].sta_seq_num = sta_seq_num;
+          other_side[other_side_head++].ap_mac = ap_mac;
+        } else if (s.sta_seq_num > sta_seq_num) {
+          // the connection is fresher on my side
+          my_side[my_side_head].sta_mac = sta_mac;
+          my_side[my_side_head].sta_seq_num = s.sta_seq_num;
+          my_side[my_side_head++].ap_mac = ap_mac;
+        }
+        my_side_in_other[i] = 1;
+        found_conn = 1;
+        break;
+      }
+    }
+    
+    if (!found_conn) {
+      // the connection is not on my side
+      other_side[other_side_head].sta_mac = sta_mac;
+      other_side[other_side_head].sta_seq_num = sta_seq_num;
+      other_side[other_side_head++].ap_mac = ap_mac;
+    }
+  }
+  
+  for (i = 0; i < MAX_NUM_NODES; i++) {
+    if (!my_side_in_other[i]) {
+      station_connection s = station_connections[i];
+      if (s.sta_mac) {
+        my_side[my_side_head].sta_mac = s.sta_mac;
+        my_side[my_side_head].sta_seq_num = s.sta_seq_num;
+        my_side[my_side_head++].ap_mac = s.ap_mac; 
+      }
+    }
+  }
+  
+  for(i = 0; i < my_side_head; i++) {
+    send_flood(my_side[i].sta_mac, my_side[i].sta_seq_num, 0, my_side[i].ap_mac, my_side[i].sta_mac);
+  }
+  for(i = 0; i < other_side_head; i++) {
+    send_flood(other_side[i].sta_mac, other_side[i].sta_seq_num, 0, other_side[i].ap_mac, other_side[i].sta_mac);
+  }
+  
+  inc_seq_num();
+  add_edge(prev_mac, module_mac, seq_num);
+  send_flood(module_mac, seq_num, 0, prev_mac, module_mac);
 }
 
 void recv_message(int from_mac, char* msg) {
