@@ -72,10 +72,10 @@ class Routing(RoutingAPI):
             self.on_receive_f(prev_mac, packets[1], int(packets[2]), int(packets[3]), packets[4], packets[5])
         # Directed packet (orig,seq_num,dest,msg)
         elif packets[0] == "D":
-            self.on_receive_d(prev_mac, packets[1], int(packets[2]), packets[3], packets[4])
+            self.on_receive_d(prev_mac, packets[1], int(packets[2]), packets[3], ",".join(packets[4:]))
         # Bootstrap packet (graph)
         elif packets[0] == "B":
-            self.on_receive_b(prev_mac, packets[1])
+            self.on_receive_b(prev_mac, ",".join(packets[1:]))
 
         # self.prt("graph after proc: {}".format(self.graph))
 
@@ -182,10 +182,10 @@ class Routing(RoutingAPI):
         my_side = self.get_ap_connections()
 
         other_side = []
-        # bootstrap packets are as follows "from_mac|seq_num|to_mac1\n..."
-        nodes = data.split("\n")
-        for n in nodes:
-            node_data = n.split("|")
+        # bootstrap packets are as follows "from_mac,seq_num,to_mac1,..."
+        nodes = data.split(",")
+        for i in range(0,len(nodes),3):
+            node_data = [nodes[i], nodes[i+1], nodes[i+2]]
             if len(node_data) >= 3:
                 # station
                 from_mac = node_data[0]
@@ -251,9 +251,9 @@ class Routing(RoutingAPI):
     def send_bootstrap(self, bootstrap_mac):
         payload = ""
         for (sta_mac, sta_seq_num, ap_mac) in self.get_ap_connections():
-            payload += "{}|{}|{}\n".format(sta_mac, sta_seq_num, ap_mac)
+            payload += ",{},{},{}".format(sta_mac, sta_seq_num, ap_mac)
 
-        self.send_data(bootstrap_mac, "B,{}".format(payload))
+        self.send_data(bootstrap_mac, "B{}".format(payload))
 
     def send_directed(self, next_mac, orig_mac, orig_seq_num, dest_mac, msg):
         self.send_data(next_mac, "D,{},{},{},{}".format(orig_mac, orig_seq_num, dest_mac, msg))

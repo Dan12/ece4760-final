@@ -20,22 +20,22 @@ class Topology(TopologyAPI):
 
     # called when a message is passed from routing to topology layer
     def recv_msg(self, from_mac, msg):
-        packets = msg.split("|")
+        packets = msg.split(",")
         # Message to next layer
         if packets[0] == "M":
-            self.on_recv_msg_handler(from_mac, packets[1])
+            self.on_recv_msg_handler(from_mac, ",".join(packets[1:]))
         # reverse edge packet
         elif packets[0] == "R":
-            self.on_receive_reverse_edge(from_mac, packets[1])
+            self.on_receive_reverse_edge(from_mac, ",".join(packets[1:]))
 
     def send_msg(self, dest_mac, msg):
-        self.router.send_message(dest_mac, "M|{}".format(msg))
+        self.router.send_message(dest_mac, "M,{}".format(msg))
 
     def get_nodes(self):
         return self.router.get_graph().keys()
 
     def on_receive_reverse_edge(self, from_mac, path_msg):
-        path = path_msg.split("/")
+        path = path_msg.split(",")
         if path[1] == self.mac:
             rev_ap = path[0]
             path.pop(0)
@@ -49,9 +49,9 @@ class Topology(TopologyAPI):
             self.router.connect_to_ap(rev_ap)
 
     def send_reverse_edge(self, path):
-        payload = "/".join(path)
+        payload = ",".join(path)
         dest = path[1]
-        self.router.send_message(dest, "R|{}".format(payload))
+        self.router.send_message(dest, "R,{}".format(payload))
 
     def get_node_in_degree(self, graph, mac):
         in_degree = 0

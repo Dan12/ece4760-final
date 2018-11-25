@@ -1,17 +1,23 @@
-import socket
-import uuid
-import re
-
-client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+from comp_wifi import CompWifi
+from routing import Routing
+from topology import Topology
 
 mesh_id = 1
+mesh_mac = "84:f3:eb:59:c2:ca"
+# mesh_id = 2
+# mesh_mac = "1a:fe:34:a0:75:e1"
 
-client.connect(("192.168.{}.1".format(mesh_id), 80))
+w = CompWifi(mesh_id, mesh_mac)
+r = Routing(w)
+t = Topology(r)
 
-my_mac = ':'.join(re.findall('..', '%012x' % uuid.getnode()))
-# send station connection confirmation
-client.send("CS#{}".format(my_mac).encode())
+def recv_msg(from_mac, msg):
+    print("APP: from {}: {}".format(from_mac, msg))
 
-while(True):
-    data = client.recv(4096)
-    print(data)
+t.register_recv_msg_handler(recv_msg)
+
+while (True):
+    print("APP: Starting cycle")
+    w.run()
+    t.run()
+    print("APP: graph: {}".format(r.get_graph()))

@@ -99,11 +99,11 @@ class WifiReal(WifiAPI):
         # TODO catch failed send
         if dest_mac in self.direct_conns:
             # Translate to linkId
-            self.serial.write_data(self.direct_conns[dest_mac], "M#{}\n".format(data))
+            self.serial.write_data(self.direct_conns[dest_mac], "M,{}\n".format(data))
             return True
         elif self.connected_ap and dest_mac == self.connected_ap[1]:
             # Translate to linkId
-            self.serial.write_data(self.connected_ap[0], "M#{}\n".format(data))
+            self.serial.write_data(self.connected_ap[0], "M,{}\n".format(data))
             return True
         return False
 
@@ -134,7 +134,7 @@ class WifiReal(WifiAPI):
             self.to_ping.append(elt)
 
     def process_data(self, linkId, data):
-        packets = data.split("#")
+        packets = data.split(",")
         self.prt("RECV packets: {}".format(packets))
         if len(packets) < 1:
             return
@@ -153,10 +153,10 @@ class WifiReal(WifiAPI):
         elif packets[0] == "P":
             self.to_ping.append((linkId,datetime.datetime.now().timestamp()+int(packets[1])))
         elif packets[0] == "M":
-            self.handle_incoming_data(self.link_id_table[linkId], packets[1])
+            self.handle_incoming_data(self.link_id_table[linkId], ",".join(packets[1:]))
 
     def ping(self, linkId):
-        self.serial.write_data(linkId, "P#{}\n".format(PING_TIME))
+        self.serial.write_data(linkId, "P,{}\n".format(PING_TIME))
 
     def process_line(self, line):
         if line.startswith("+IPD"):
@@ -207,7 +207,7 @@ class WifiReal(WifiAPI):
                 self.serial.write_cmd("AT+CIPSTART={},\"TCP\",\"192.168.{}.1\",80".format(linkId, ap_id))
 
                 # send the AP your information
-                self.serial.write_data(linkId, "CS#{}\n".format(self.mac))
+                self.serial.write_data(linkId, "CS,{}\n".format(self.mac))
 
                 # assign ap
                 self.connected_ap = (linkId, ap_mac)
