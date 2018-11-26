@@ -455,10 +455,12 @@ visible_mac* wifi_get_visible_macs() {
       
       tmp = strp(&str, ",");
       char* rssi = strp(&str, ",");
+      if (rssi == NULL) break;
       visible_macs[i].strength = -atoi(rssi);
       
       tmp = strp(&str, "\"");
       char* mac = strp(&str, "\"");
+      if (mac == NULL) break;
       visible_macs[i].mac = parse_mac(mac);
       
       i++;

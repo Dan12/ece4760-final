@@ -12,6 +12,7 @@
       <itemPath>wifi.h</itemPath>
       <itemPath>logger.h</itemPath>
       <itemPath>routing.h</itemPath>
+      <itemPath>topology.h</itemPath>
     </logicalFolder>
     <logicalFolder name="LinkerScript"
                    displayName="Linker Files"

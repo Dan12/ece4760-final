@@ -14,6 +14,9 @@ graph_entry* routing_get_graph() {
   return graph;
 }
 
+/**
+ * Dump this nodes current view of the network to the comp uart
+ */
 void dump_graph() {
   comp_log("Routing", "Dumping graph");
   int i;
@@ -65,11 +68,18 @@ adj_node_entry* get_adj_node(graph_entry* e, int mac) {
   return &empty_adj_node_entry;
 }
 
+/**
+ * @param mac the mac to search for
+ * @return 1 if mac has an entry in the graph, 0 otherwise
+ */
 int node_exists(int mac) {
   return get_graph_entry(mac)->mac == mac;
 }
 
-
+/**
+ * Reset the adj node list for graph entry i
+ * @param i
+ */
 void clear_adj_node_list(int i) {
   int j;
   for (j = 0; j < MAX_NUM_CONNECTIONS; j++) {
@@ -78,6 +88,12 @@ void clear_adj_node_list(int i) {
   }
 }
 
+/**
+ * Create a node entry in the graph with the given mac address if no
+ * node with that mac address exists
+ * @param mac
+ * @return 1 if new node created, 0 if node already exists or no space left
+ */
 int create_node(int mac) {
   if (!node_exists(mac)) {
     sprintf(send_buf, "mac doesn't exist");
@@ -97,6 +113,15 @@ int create_node(int mac) {
   return 0;
 }
 
+/**
+ * Create an edge in the graph from node represented by e to the given mac.
+ * @param e one endpoint of the edge
+ * @param mac the other endpoint of the edge
+ * @param type the type of edge: 1 means that e is the station and mac is the 
+ * ap, 0 means e is the ap and mac is the station
+ * @return 2 if the edge was updated, 1 if the edge was created, 0 of the edge
+ * was not created
+ */
 int create_edge(graph_entry* e, int mac, int type) {
   int i;
   for (i = 0; i < MAX_NUM_CONNECTIONS; i++) {
@@ -117,6 +142,13 @@ int create_edge(graph_entry* e, int mac, int type) {
   return 0;
 }
 
+/**
+ * Add an edge to the graph if th sequence number is valid.
+ * Must go in both directions. Also, update the sequence number
+ * @param mac_ap the mac address of the ap
+ * @param mac_sta the mac address of the station
+ * @param seq_num the sequence number of the station claiming to create the edge
+ */
 void add_edge(int mac_ap, int mac_sta, int seq_num) {
   create_node(mac_ap);
   create_node(mac_sta);
@@ -130,6 +162,11 @@ void add_edge(int mac_ap, int mac_sta, int seq_num) {
   }
 }
 
+/**
+ * Convert a mac address to its graph entry index
+ * @param mac
+ * @return 
+ */
 int get_mac_graph_index(int mac) {
   int i;
   for (i = 0; i < MAX_NUM_NODES; i++) {
@@ -140,6 +177,9 @@ int get_mac_graph_index(int mac) {
   return MAX_NUM_NODES;
 }
 
+/**
+ * Remove all disconnected nodes from the graph
+ */
 void prune_graph() {
   graph_entry* queue[MAX_NUM_NODES];
   int queue_read = 0;
@@ -178,6 +218,13 @@ void prune_graph() {
   }
 }
 
+/**
+ * Remove an edge between two macs and prune the graph of disconnected
+ * components if the sequence number is valid for the remove edge action
+ * @param mac_1
+ * @param mac_2
+ * @param seq_num
+ */
 void remove_edge(int mac_1, int mac_2, int seq_num) {
   if(node_exists(mac_1) && node_exists(mac_2)) {
     graph_entry* e_1 = get_graph_entry(mac_1);
@@ -197,6 +244,13 @@ void remove_edge(int mac_1, int mac_2, int seq_num) {
 
 void mac_disconnected(int mac);
 
+/**
+ * Send a message to the given neighboring node. If this fails, disconnect from
+ * the neighboring node
+ * @param next_hop
+ * @param msg
+ * @return 
+ */
 int send_msg(int next_hop, char* msg) {
   if (!wifi_send_data(next_hop, msg)) {
     sprintf(send_buf, "Failed to send");
@@ -212,9 +266,11 @@ typedef struct station_connection {
   int sta_seq_num;
   int ap_mac;
 } station_connection;
-station_connection station_connections[MAX_NUM_NODES];
+station_connection station_connections[MAX_NUM_NODES+1];
 
-// returns a list of all edges of type 1
+/**
+ * sets the station connections list to a list of all edges of type 1
+ */
 void get_station_connections() {
   int s = 0;
   int i;
@@ -233,13 +289,17 @@ void get_station_connections() {
     }
   }
   
-  for(; s < MAX_NUM_NODES; s++) {
+  for(; s < MAX_NUM_NODES+1; s++) {
     station_connections[s].sta_mac = 0;
     station_connections[s].sta_seq_num = 0;
     station_connections[s].ap_mac = 0;
   }
 }
 
+/**
+ * Send a bootstrap packet to the given mac address
+ * @param bootstrap_mac
+ */
 void send_bootstrap(int bootstrap_mac) {
   char* buf = send_buf;
   sprintf(buf, "B");
@@ -256,11 +316,28 @@ void send_bootstrap(int bootstrap_mac) {
   send_msg(bootstrap_mac, send_buf);
 }
 
+/**
+ * Send a directed packet with the given information to the next hop
+ * @param next_hop
+ * @param orig_mac
+ * @param orig_seq_num
+ * @param dest_mac
+ * @param msg
+ * @return 
+ */
 int send_directed(int next_hop, int orig_mac, int orig_seq_num, int dest_mac, char* msg) {
   sprintf(send_buf, "D,%d,%d,%d,%s", orig_mac, orig_seq_num, dest_mac, msg);
   return send_msg(next_hop, send_buf);
 }
 
+/**
+ * Send a flood packet with the given information to all neighbors
+ * @param orig_mac
+ * @param orig_seq_num
+ * @param f_type
+ * @param mac_1
+ * @param mac_2
+ */
 void send_flood(int orig_mac, int orig_seq_num, int f_type, int mac_1, int mac_2) {
   sprintf(send_buf, "F,%d,%d,%d,%d,%d", orig_mac, orig_seq_num, f_type, mac_1, mac_2);
   int i = 0;
@@ -274,6 +351,10 @@ void send_flood(int orig_mac, int orig_seq_num, int f_type, int mac_1, int mac_2
 static void(*recv_handler)(int mac, char* msg);
 static int seq_num;
 
+/**
+ * @param mac
+ * @return 1 if the given mac is directly connected to this node, 0 otherwise
+ */
 int is_in_direct_conns(int mac) {
   int i;
   int* direct_conns = wifi_get_direct_connections();
@@ -360,6 +441,12 @@ void on_receive_direct(int orig_mac, int orig_seq_num, int dest_mac, char* msg) 
   }
 }
 
+/**
+ * Parse a bootstrap packet in data sent from prev_mac.
+ * Flood the new information to the network
+ * @param prev_mac
+ * @param data
+ */
 void on_receive_bootstrap(int prev_mac, char* data) {
   get_station_connections();
   station_connection my_side[MAX_NUM_NODES];

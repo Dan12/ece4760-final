@@ -34,7 +34,7 @@ def parse_mac(mac):
     return str(int32(m))
 
 # disconnect time is 180 seconds
-PING_TIME = 30
+PING_TIME = 5000
 
 class WifiReal(WifiAPI):
 
@@ -171,7 +171,7 @@ class WifiReal(WifiAPI):
             self.station_connection(packets[1])
         # ping packet to keep connection alive
         elif packets[0] == "P":
-            self.to_ping.append((linkId,datetime.datetime.now().timestamp()+int(packets[1])))
+            self.to_ping.append((linkId,datetime.datetime.now().timestamp()+int(packets[1])/1000))
         elif packets[0] == "M":
             self.handle_incoming_data(self.link_id_table[linkId], ",".join(packets[1:]))
 
