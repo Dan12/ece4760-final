@@ -26,6 +26,7 @@
 #include "wifi.h"
 #include "logger.h"
 #include "routing.h"
+#include "topology.h"
 
 #define DEVICE_ID 1
 
@@ -49,22 +50,11 @@ int main(void) {
   
   routing_setup();
   
-  static char log_buf[256];
+  topology_setup();
   
   while(1) {
     wifi_run();
-    visible_mac* vis_macs = wifi_get_visible_macs();
-    int i = 0;
-    while(vis_macs[i].mac) {
-      sprintf(log_buf, "Vis mac: %d %s %d", vis_macs[i].mac, vis_macs[i].ssid, vis_macs[i].strength);
-      comp_log("APP", log_buf);
-      if (!wifi_get_connected_ap()) {
-        sprintf(log_buf, "Connecting to ap");
-        comp_log("APP", log_buf);
-        wifi_connect_to_ap(vis_macs[i].mac);
-      }
-      break;
-    }
+    topology_run();
   }
 }
 

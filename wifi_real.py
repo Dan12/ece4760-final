@@ -224,7 +224,8 @@ class WifiReal(WifiAPI):
                 self.serial.write_cmd("AT+CWJAP_CUR=\"ESP8266-Mesh-{}\",\"1234567890\"".format(ap_id))
                 
                 linkId = self.get_next_linkId()
-                self.serial.write_cmd("AT+CIPSTART={},\"TCP\",\"192.168.{}.1\",80".format(linkId, ap_id))
+                # 30 second timeout, ping every 5 seconds
+                self.serial.write_cmd("AT+CIPSTART={},\"TCP\",\"192.168.{}.1\",80,30".format(linkId, ap_id))
 
                 # send the AP your information
                 self.serial.write_data(linkId, "CS,{}\n".format(self.mac))

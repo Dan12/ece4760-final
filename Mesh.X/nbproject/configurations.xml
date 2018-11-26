@@ -27,6 +27,7 @@
       <itemPath>string_util.c</itemPath>
       <itemPath>wifi.c</itemPath>
       <itemPath>routing.c</itemPath>
+      <itemPath>topology.c</itemPath>
     </logicalFolder>
     <logicalFolder name="ExternalFiles"
                    displayName="Important Files"

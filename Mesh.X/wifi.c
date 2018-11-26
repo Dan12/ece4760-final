@@ -326,6 +326,9 @@ int wifi_send_data(int dest_mac, char* msg) {
       return 1;
     }
   }
+  sprintf(logbuff, "Failed to send");
+  comp_log("WIFI_DBG", logbuff);
+  link_id_disconnected(mac_to_link_id(dest_mac));
   return 0;
 }
 
@@ -363,11 +366,11 @@ int wifi_connect_to_ap(int ap_mac) {
       sprintf(cmd_buf, "AT+CWJAP_CUR=\"%s\",\"1234567890\"", ap_ssid);
       SEND_CMD_OK(cmd_buf);
 
-      // TODO lower timeout time
       int link_id = get_next_link_id();
       sprintf(logbuff, "link id %d", link_id);
       comp_log("WIFI_DBG", logbuff);
-      sprintf(cmd_buf, "AT+CIPSTART=%d,\"TCP\",\"192.168.%d.1\",80", link_id, ap_id);
+      // set timeout to be 30 seconds, ping time is 5 seconds
+      sprintf(cmd_buf, "AT+CIPSTART=%d,\"TCP\",\"192.168.%d.1\",80,30", link_id, ap_id);
       SEND_CMD_OK(cmd_buf);
       
       // send the AP your information
@@ -416,11 +419,15 @@ int* wifi_get_direct_connections() {
   int j = 0;
   for (i = 0; i < MAX_CONNECTIONS; i++) {
     if (link_id_to_mac[i] != 0 && link_id_to_mac[i] != -1) {
+      sprintf(logbuff, "direct conn %d %d", i, link_id_to_mac[i]);
+      comp_log("WIFI_DBG", logbuff);
       direct_connections[j++] = link_id_to_mac[i];
     }    
   }
   
   for(; j < MAX_CONNECTIONS+1; j++) {
+    sprintf(logbuff, "zero out %d", j);
+    comp_log("WIFI_DBG", logbuff);
     direct_connections[j] = 0;
   }
   

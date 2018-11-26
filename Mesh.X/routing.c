@@ -245,20 +245,13 @@ void remove_edge(int mac_1, int mac_2, int seq_num) {
 void mac_disconnected(int mac);
 
 /**
- * Send a message to the given neighboring node. If this fails, disconnect from
- * the neighboring node
+ * Send a message to the given neighboring node
  * @param next_hop
  * @param msg
  * @return 
  */
 int send_msg(int next_hop, char* msg) {
-  if (!wifi_send_data(next_hop, msg)) {
-    sprintf(send_buf, "Failed to send");
-    comp_log("Routing", send_buf);
-    mac_disconnected(next_hop);
-    return 0;
-  }
-  return 1;
+  return wifi_send_data(next_hop, msg);
 }
 
 typedef struct station_connection {
@@ -356,9 +349,11 @@ static int seq_num;
  * @return 1 if the given mac is directly connected to this node, 0 otherwise
  */
 int is_in_direct_conns(int mac) {
-  int i;
+  int i = 0;
   int* direct_conns = wifi_get_direct_connections();
   while(direct_conns[i]) {
+    sprintf(send_buf, "direct connection %d", direct_conns[i]);
+    comp_log("Routing", send_buf);
     if (direct_conns[i] == mac) {
       return 1;
     }
@@ -379,10 +374,14 @@ void inc_seq_num() {
 void mac_disconnected(int mac) {
   sprintf(send_buf, "Disconnecting %d", mac);
   comp_log("Routing", send_buf);
-  if (is_in_direct_conns(mac)) {
+  if (!is_in_direct_conns(mac)) {
+    sprintf(send_buf, "Not in dir conns");
+    comp_log("Routing", send_buf);
     inc_seq_num();
     int module_mac = get_module_mac();
+    dump_graph();
     remove_edge(module_mac, mac, seq_num);
+    dump_graph();
     send_flood(module_mac, seq_num, 1, module_mac, mac); 
   }
 }
