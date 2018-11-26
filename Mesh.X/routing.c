@@ -145,6 +145,7 @@ void prune_graph() {
   int queue_read = 0;
   int queue_write = 0;
   int visited[MAX_NUM_NODES];
+  int module_mac = get_module_mac();
   graph_entry* node = get_graph_entry(module_mac);
   // make sure node is in graph
   if (node->mac == module_mac) {
@@ -287,6 +288,7 @@ int is_in_direct_conns(int mac) {
 
 void inc_seq_num() {
   seq_num++;
+  int module_mac = get_module_mac();
   graph_entry* m = get_graph_entry(module_mac);
   if (m->mac == module_mac) {
     m->seq_num = seq_num;
@@ -298,6 +300,7 @@ void mac_disconnected(int mac) {
   comp_log("Routing", send_buf);
   if (is_in_direct_conns(mac)) {
     inc_seq_num();
+    int module_mac = get_module_mac();
     remove_edge(module_mac, mac, seq_num);
     send_flood(module_mac, seq_num, 1, module_mac, mac); 
   }
@@ -349,7 +352,7 @@ void on_receive_flood(int prev_mac, int orig_mac, int orig_seq_num, int f_type, 
 
 void on_receive_direct(int orig_mac, int orig_seq_num, int dest_mac, char* msg) {
   if (is_valid_seq_number(orig_mac, orig_seq_num)) {
-    if (dest_mac = module_mac) {
+    if (dest_mac == get_module_mac()) {
       recv_handler(orig_mac, msg);
     } else {
       send_directed(get_next_hop(dest_mac), orig_mac, orig_seq_num, dest_mac, msg);
@@ -368,6 +371,9 @@ void on_receive_bootstrap(int prev_mac, char* data) {
   }
   station_connection other_side[MAX_NUM_NODES];
   int other_side_head = 0;
+  
+  sprintf(send_buf, "data %s", data);
+  comp_log("Routing", send_buf);
   
   while(data) {
     int sta_mac = atoi(strp(&data, ","));
@@ -405,8 +411,12 @@ void on_receive_bootstrap(int prev_mac, char* data) {
   }
   
   for (i = 0; i < MAX_NUM_NODES; i++) {
+    sprintf(send_buf, "msio %d %d", i, my_side_in_other[i]);
+    comp_log("Routing", send_buf);
     if (!my_side_in_other[i]) {
       station_connection s = station_connections[i];
+      sprintf(send_buf, "sta %d %d %d", s.sta_mac, s.sta_seq_num, s.ap_mac);
+      comp_log("Routing", send_buf);
       if (s.sta_mac) {
         my_side[my_side_head].sta_mac = s.sta_mac;
         my_side[my_side_head].sta_seq_num = s.sta_seq_num;
@@ -415,6 +425,12 @@ void on_receive_bootstrap(int prev_mac, char* data) {
     }
   }
   
+  sprintf(send_buf, "msh %d", my_side_head);
+  comp_log("Routing", send_buf);
+
+  sprintf(send_buf, "osh %d", other_side_head);
+  comp_log("Routing", send_buf);
+  
   for(i = 0; i < my_side_head; i++) {
     send_flood(my_side[i].sta_mac, my_side[i].sta_seq_num, 0, my_side[i].ap_mac, my_side[i].sta_mac);
   }
@@ -422,6 +438,10 @@ void on_receive_bootstrap(int prev_mac, char* data) {
     send_flood(other_side[i].sta_mac, other_side[i].sta_seq_num, 0, other_side[i].ap_mac, other_side[i].sta_mac);
   }
   
+  int module_mac = get_module_mac();
+  
+  sprintf(send_buf, "mm %d", module_mac);
+  comp_log("Routing", send_buf);
   inc_seq_num();
   add_edge(prev_mac, module_mac, seq_num);
   send_flood(module_mac, seq_num, 0, prev_mac, module_mac);
@@ -494,6 +514,7 @@ int get_next_hop(int dest_mac) {
   int queue_read = 0;
   int queue_write = 0;
   int visited[MAX_NUM_NODES];
+  int module_mac = get_module_mac();
   graph_entry* init_node = get_graph_entry(module_mac);
   // make sure node is in graph
   if (init_node->mac == module_mac) {
@@ -532,7 +553,7 @@ int routing_send_message(int dest_mac, char* msg) {
   int next_hop = get_next_hop(dest_mac);
   if (next_hop) {
     inc_seq_num();
-    return send_directed(next_hop, module_mac, seq_num, dest_mac, msg);
+    return send_directed(next_hop, get_module_mac(), seq_num, dest_mac, msg);
   }
   return 0;
 }

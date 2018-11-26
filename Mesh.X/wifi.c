@@ -29,6 +29,13 @@ static char* read_buffer = _read_buffer;
 static int buf_ptr = 0;
 static int most_recent_result = 0;
 
+// The AP mac address of the wifi module
+static int module_mac = 0;
+
+int get_module_mac() {
+  return module_mac;
+}
+
 enum INFO_TYPE {
   DATA,
   OPENED,
@@ -230,6 +237,8 @@ int wifi_setup(char id) {
   tmp = strp(&str, "\"");
   char* mac = strp(&str, "\"");
   module_mac = parse_mac(mac);
+  sprintf(logbuff, "mod mac %d", module_mac);
+  comp_log("WIFI_DBG", logbuff);
   
   // set local IP address to a different number
   sprintf(cmd_buf, "AT+CIPAP_CUR=\"192.168.%d.1\",\"192.168.%d.1\",\"255.255.255.0\"", id, id);
@@ -244,6 +253,8 @@ int wifi_setup(char id) {
   // set ssid (name), pwd, chnl, enc
   sprintf(cmd_buf, "AT+CWSAP_CUR=\"ESP8266-Mesh-%d\",\"1234567890\",1,3", id);
   SEND_CMD_OK(cmd_buf);
+  sprintf(logbuff, "mod mac %d", module_mac);
+  comp_log("WIFI_DBG", logbuff);
 }
 
 void wifi_register_recv_handler(void(*handler)(int mac, char* msg)) {
@@ -265,7 +276,7 @@ void wifi_register_sta_connection_handler(void(*handler)(int sta_mac)) {
  * @return Return 1 if success, 0 if failure
  */
 int send_data(int link_id, char* type, char* data) {
-  sprintf(logbuff, "sending data: %s", data);
+  sprintf(logbuff, "sending data: %s %s", type, data);
   comp_log("WIFI_DBG", logbuff);
   int len = strlen(type) + strlen(data) + 2;
   sprintf(cmd_buf, "AT+CIPSENDBUF=%d,%d", link_id, len);
@@ -335,6 +346,8 @@ char* get_visible_ssid(int mac) {
 int get_next_link_id() {
   int i;
   for (i = 0; i < MAX_CONNECTIONS; i++) {
+    sprintf(logbuff, "link id at %d %d", i, link_id_to_mac[i]);
+    comp_log("WIFI_DBG", logbuff);
     if (link_id_to_mac[i] == 0) {
       return i;
     }
@@ -352,6 +365,8 @@ int wifi_connect_to_ap(int ap_mac) {
 
       // TODO lower timeout time
       int link_id = get_next_link_id();
+      sprintf(logbuff, "link id %d", link_id);
+      comp_log("WIFI_DBG", logbuff);
       sprintf(cmd_buf, "AT+CIPSTART=%d,\"TCP\",\"192.168.%d.1\",80", link_id, ap_id);
       SEND_CMD_OK(cmd_buf);
       
@@ -435,7 +450,7 @@ visible_mac* wifi_get_visible_macs() {
   int i = 0;
   while(tmp != NULL && most_recent_result) {
     char* ssid = strp(&str, "\"");
-    if (starts_with(ssid, strlen(ssid), "ESP8266", 7) == 0) {
+    if (starts_with(ssid, strlen(ssid), "ESP8266-Mesh-", 7)) {
       strcpy(visible_macs[i].ssid, ssid);
       
       tmp = strp(&str, ",");

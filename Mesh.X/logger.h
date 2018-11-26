@@ -10,7 +10,8 @@
 
 #include "uart.h"
 
-static char log_buff[1024];
+// make sure we have enough space for msg + layer
+static char log_buff[1124];
 static void comp_log(char* layer, char* msg) {
     sprintf(log_buff, "%s: %s", layer, msg);
     send_cmd(log_buff, UART_COMP);

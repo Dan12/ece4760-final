@@ -8,8 +8,7 @@
 #ifndef WIFI_H
 #define	WIFI_H
 
-// The AP mac address of the wifi module
-static int module_mac;
+int get_module_mac();
 
 /**
  * Setup the wifi module with the given id
