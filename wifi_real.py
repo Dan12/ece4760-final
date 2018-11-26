@@ -14,6 +14,25 @@ macRE = re.compile('(?:[0-9a-fA-F]:?){12}')
 def safe_dec(b):
 	return b.decode('utf-8', errors='ignore')
 
+def int32(x):
+  if x>0xFFFFFFFF:
+    raise OverflowError
+  if x>0x7FFFFFFF:
+    x=int(0x100000000-x)
+    if x<2147483648:
+      return -x
+    else:
+      return -2147483648
+  return x
+
+def parse_mac(mac):
+    p = mac.split(":")
+    m = int(p[2], 16) << 24
+    m |= int(p[3], 16) << 16 
+    m |= int(p[4], 16) << 8
+    m |= int(p[5], 16)
+    return str(int32(m))
+
 # disconnect time is 180 seconds
 PING_TIME = 30
 
@@ -74,7 +93,7 @@ class WifiReal(WifiAPI):
         self.serial.write_cmd("AT+CWMODE=3")
         # get mac
         result = safe_dec(self.serial.write_cmd("AT+CIPAPMAC_CUR?"))
-        self.mac = macRE.findall(result)[0]
+        self.mac = parse_mac(macRE.findall(result)[0])
         # mac_lsb = int(self.mac[-2:], 16)
         self.prt(self.mac)
         # set ip address to avoid conflicts
@@ -96,6 +115,7 @@ class WifiReal(WifiAPI):
                 self.on_recv_handler(from_mac, data)
 
     def send_data(self, dest_mac, data):
+        self.prt("To {} sending: {}".format(dest_mac, data))
         # TODO catch failed send
         if dest_mac in self.direct_conns:
             # Translate to linkId
@@ -109,7 +129,7 @@ class WifiReal(WifiAPI):
 
     def listen_for_lines(self):
         line = self.serial.read_line()
-        # self.prt("Listened for bytes: %s" % line)
+        self.prt("Listened for bytes: %s" % line)
         next_line = self.serial.pop_proc_queue()
         if next_line:
             self.process_line(safe_dec(next_line))
@@ -276,7 +296,7 @@ class WifiReal(WifiAPI):
             parts = ap.split(",")
             ssid = parts[0][:-1]
             rssi = int(parts[1])
-            mac = parts[2][1:]
+            mac = parse_mac(parts[2][1:])
             self.prt("{} {} {}".format(ssid, rssi, mac))
 
             self.visible_modules[mac] = ssid

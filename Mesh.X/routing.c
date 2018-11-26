@@ -3,6 +3,7 @@
 
 #include "routing.h"
 #include "string_util.h"
+#include "logger.h"
 
 static char send_buf[1024];
 
@@ -13,6 +14,30 @@ graph_entry* routing_get_graph() {
   return graph;
 }
 
+void dump_graph() {
+  comp_log("Routing", "Dumping graph");
+  int i;
+  for (i = 0; i < MAX_NUM_NODES; i++) {
+    if (graph[i].mac) {
+      sprintf(send_buf, "G: %d %d", graph[i].mac, graph[i].seq_num);
+      comp_log("Routing", send_buf);
+      int j;
+      for (j = 0; j < MAX_NUM_CONNECTIONS; j++) {
+        if (graph[i].adj_nodes[j].mac) {
+          sprintf(send_buf, "    %d: %d %d", j, graph[i].adj_nodes[j].mac, graph[i].adj_nodes[j].type);
+          comp_log("Routing", send_buf); 
+        }
+      }
+    }
+  }
+}
+
+/**
+ * Get a pointer to the graph entry for the given mac. Returns 
+ * an empty graph entry if not found (mac = 0)
+ * @param mac
+ * @return 
+ */
 graph_entry* get_graph_entry(int mac) {
   int i;
   for (i = 0; i < MAX_NUM_NODES; i++) {
@@ -23,6 +48,13 @@ graph_entry* get_graph_entry(int mac) {
   return &graph[MAX_NUM_NODES];
 }
 
+/**
+ * Get the adj node entry that is connected to the given graph node
+ * and has the given mac. Returns an empty adj node entry if not found (mac = 0)
+ * @param e
+ * @param mac
+ * @return 
+ */
 adj_node_entry* get_adj_node(graph_entry* e, int mac) {
   int j;
   for (j = 0; j < MAX_NUM_CONNECTIONS; j++) {
@@ -48,10 +80,14 @@ void clear_adj_node_list(int i) {
 
 int create_node(int mac) {
   if (!node_exists(mac)) {
+    sprintf(send_buf, "mac doesn't exist");
+    comp_log("Routing", send_buf);
     int i;
     for (i = 0; i < MAX_NUM_NODES; i++) {
       if (graph[i].mac == 0) {
-        graph[i].mac = 0;
+        sprintf(send_buf, "found empty entry %d", i);
+        comp_log("Routing", send_buf);
+        graph[i].mac = mac;
         graph[i].seq_num = 0;
         clear_adj_node_list(i);
         return 1;
@@ -71,6 +107,8 @@ int create_edge(graph_entry* e, int mac, int type) {
   }
   for (i = 0; i < MAX_NUM_CONNECTIONS; i++) {
     if (e->adj_nodes[i].mac == 0) {
+      sprintf(send_buf, "found empty entry for edge %d", i);
+      comp_log("Routing", send_buf);
       e->adj_nodes[i].mac = mac;
       e->adj_nodes[i].type = type;
       return 1;
@@ -160,6 +198,8 @@ void mac_disconnected(int mac);
 
 int send_msg(int next_hop, char* msg) {
   if (!wifi_send_data(next_hop, msg)) {
+    sprintf(send_buf, "Failed to send");
+    comp_log("Routing", send_buf);
     mac_disconnected(next_hop);
     return 0;
   }
@@ -222,7 +262,7 @@ int send_directed(int next_hop, int orig_mac, int orig_seq_num, int dest_mac, ch
 
 void send_flood(int orig_mac, int orig_seq_num, int f_type, int mac_1, int mac_2) {
   sprintf(send_buf, "F,%d,%d,%d,%d,%d", orig_mac, orig_seq_num, f_type, mac_1, mac_2);
-  int i;
+  int i = 0;
   int* dir_conns = wifi_get_direct_connections();
   while(dir_conns[i]) {
     send_msg(dir_conns[i], send_buf); 
@@ -254,6 +294,8 @@ void inc_seq_num() {
 }
 
 void mac_disconnected(int mac) {
+  sprintf(send_buf, "Disconnecting %d", mac);
+  comp_log("Routing", send_buf);
   if (is_in_direct_conns(mac)) {
     inc_seq_num();
     remove_edge(module_mac, mac, seq_num);
@@ -275,6 +317,12 @@ void sta_connected(int mac) {
  */
 int is_valid_seq_number(int mac, int seq_num) {
   graph_entry* e = get_graph_entry(mac);
+  sprintf(send_buf, "e %d", e->mac);
+  comp_log("Routing", send_buf);
+  sprintf(send_buf, "es %d", e->seq_num);
+  comp_log("Routing", send_buf);
+  sprintf(send_buf, "m %d", mac);
+  comp_log("Routing", send_buf);
   if (e->mac == mac) {
     if (e->seq_num < seq_num) {
       e->seq_num = seq_num;
@@ -380,13 +428,27 @@ void on_receive_bootstrap(int prev_mac, char* data) {
 }
 
 void recv_message(int from_mac, char* msg) {
+  sprintf(send_buf, "From %d: %s", from_mac, msg);
+  comp_log("Routing", send_buf);
   char* type = strp(&msg, ",");
+  sprintf(send_buf, "Type %s", type);
+  comp_log("Routing", send_buf);
   if (type[0] == 'F') {
     int orig_mac = atoi(strp(&msg, ","));
+    sprintf(send_buf, "m %d", orig_mac);
+    comp_log("Routing", send_buf);
     int orig_seq_num = atoi(strp(&msg, ","));
+    sprintf(send_buf, "s %d", orig_seq_num);
+    comp_log("Routing", send_buf);
     int f_type = atoi(strp(&msg, ","));
+    sprintf(send_buf, "t %d", f_type);
+    comp_log("Routing", send_buf);
     int mac_1 = atoi(strp(&msg, ","));
+    sprintf(send_buf, "1 %d", mac_1);
+    comp_log("Routing", send_buf);
     int mac_2 = atoi(strp(&msg, ","));
+    sprintf(send_buf, "2 %d", mac_2);
+    comp_log("Routing", send_buf);
     on_receive_flood(from_mac, orig_mac, orig_seq_num, f_type, mac_1, mac_2);
   } else if (type[0] == 'D') {
     int orig_mac = atoi(strp(&msg, ","));
@@ -396,6 +458,7 @@ void recv_message(int from_mac, char* msg) {
   } else if (type[0] == 'B') {
     on_receive_bootstrap(from_mac, msg);
   }
+  dump_graph();
 }
 
 int routing_setup() {

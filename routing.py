@@ -185,28 +185,29 @@ class Routing(RoutingAPI):
         # bootstrap packets are as follows "from_mac,seq_num,to_mac1,..."
         nodes = data.split(",")
         for i in range(0,len(nodes),3):
-            node_data = [nodes[i], nodes[i+1], nodes[i+2]]
-            if len(node_data) >= 3:
-                # station
-                from_mac = node_data[0]
-                from_seq_num = int(node_data[1])
-                # ap
-                to_mac = node_data[2]
+            if i+2 < len(nodes):
+                node_data = [nodes[i], nodes[i+1], nodes[i+2]]
+                if len(node_data) >= 3:
+                    # station
+                    from_mac = node_data[0]
+                    from_seq_num = int(node_data[1])
+                    # ap
+                    to_mac = node_data[2]
 
-                # TODO potentially remove edge if STA->AP connection is inconsistent
+                    # TODO potentially remove edge if STA->AP connection is inconsistent
 
-                self.add_edge(to_mac, from_mac, from_seq_num)
-                # prune for cycles?
-                # TODO also prune where edge is same but seq num is lower
-                in_my_side = self.is_in_my_side(from_mac, from_seq_num, to_mac, my_side)
-                if (from_mac, from_seq_num, to_mac) in my_side:
-                    my_side.remove((from_mac, from_seq_num, to_mac))
-                elif in_my_side:
-                    my_side.remove(in_my_side)
-                    other_side.append((from_mac, from_seq_num, to_mac))
-                else:
-                    other_side.append((from_mac, from_seq_num, to_mac))
-                # other_side.append((from_mac, from_seq_num, to_mac))
+                    self.add_edge(to_mac, from_mac, from_seq_num)
+                    # prune for cycles?
+                    # TODO also prune where edge is same but seq num is lower
+                    in_my_side = self.is_in_my_side(from_mac, from_seq_num, to_mac, my_side)
+                    if (from_mac, from_seq_num, to_mac) in my_side:
+                        my_side.remove((from_mac, from_seq_num, to_mac))
+                    elif in_my_side:
+                        my_side.remove(in_my_side)
+                        other_side.append((from_mac, from_seq_num, to_mac))
+                    else:
+                        other_side.append((from_mac, from_seq_num, to_mac))
+                    # other_side.append((from_mac, from_seq_num, to_mac))
                 
         my_side_macs = self.get_direct_conns()
         my_side_macs.remove(prev_mac)

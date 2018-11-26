@@ -1,11 +1,11 @@
 class WifiSerial:
     def __init__(self, ser, prt):
         self.ser = ser
-        # self.prt = prt
+        self.prt = prt
         self.proc_queue = []
 
-    def prt(self, msg):
-        pass
+    # def prt(self, msg):
+    #     pass
 
     def pop_proc_queue(self):
         if self.proc_queue:

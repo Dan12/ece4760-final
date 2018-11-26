@@ -128,7 +128,7 @@ void fill_read_buffer() {
 }
 
 void ping(int link_id) {
-  send_data(link_id, "P," PING_MS_STR);
+  send_data(link_id, "P", PING_MS_STR);
 }
 
 void run_pings() {
@@ -168,8 +168,10 @@ void process_packet_buffer() {
     if (p.t == CLOSED) {
       link_id_disconnected(p.link_id);
     } else if (p.t == OPENED) {
-      // set it to not 0 so that it can't be used in get_next_link_id
-      link_id_to_mac[p.link_id] = -1;
+      if (!link_id_to_mac[p.link_id]) {
+        // set it to not 0 so that it can't be used in get_next_link_id
+        link_id_to_mac[p.link_id] = -1; 
+      }
     } else if (p.t == DATA) {
       char* next = strchr(p.data, ',');
       if (next) {
@@ -213,7 +215,7 @@ int wifi_setup(char id) {
   SEND_CMD_OK("AT");
   
   // setup random IP so that nobody connects to us while we setup
-  SEND_CMD_OK("AT+CWSAP_CUR=\"PLZ-DONT-CONNECT\",\"somerandomnoise97501985\",1,0,4,0");
+  SEND_CMD_OK("AT+CWSAP_CUR=\"PLZ-DONT-CONNECT\",\"somerandomnoise97501985\",1,3");
   
   // get info
   SEND_CMD_OK("AT+GMR");
@@ -240,7 +242,7 @@ int wifi_setup(char id) {
   SEND_CMD_OK("AT+CIPSERVER=1,80");
   
   // set ssid (name), pwd, chnl, enc
-  sprintf(cmd_buf, "AT+CWSAP_CUR=\"ESP8266-Mesh-%d\",\"1234567890\",5,3", id);
+  sprintf(cmd_buf, "AT+CWSAP_CUR=\"ESP8266-Mesh-%d\",\"1234567890\",1,3", id);
   SEND_CMD_OK(cmd_buf);
 }
 
@@ -262,16 +264,21 @@ void wifi_register_sta_connection_handler(void(*handler)(int sta_mac)) {
  * @param data
  * @return Return 1 if success, 0 if failure
  */
-int send_data(int link_id, char* data) {
+int send_data(int link_id, char* type, char* data) {
   sprintf(logbuff, "sending data: %s", data);
   comp_log("WIFI_DBG", logbuff);
-  int len = strlen(data);
+  int len = strlen(type) + strlen(data) + 2;
   sprintf(cmd_buf, "AT+CIPSENDBUF=%d,%d", link_id, len);
   SEND_CMD_OK(cmd_buf);
   
+  while(*type != NULL) {
+    send_byte(*(type++), UART_ESP);
+  }
+  send_byte(',', UART_ESP);
   while(*data != NULL) {
     send_byte(*(data++), UART_ESP);
   }
+  send_byte('\n', UART_ESP);
   
   fill_read_buffer();
   if (!most_recent_result) return 0;
@@ -286,14 +293,12 @@ int send_data(int link_id, char* data) {
  */
 int mac_to_link_id(int mac) {
   int i;
-  int link_id = -1;
   for (i = 0; i < MAX_CONNECTIONS; i++) {
     if (link_id_to_mac[i] == mac) {
-      link_id = i;
-      break;
+      return i;
     }
   }
-  return link_id;
+  return -1;
 }
 
 /**
@@ -305,7 +310,7 @@ int mac_to_link_id(int mac) {
 int wifi_send_data(int dest_mac, char* msg) {
   int link_id_to_send = mac_to_link_id(dest_mac);
   if (link_id_to_send != -1) {
-    if (send_data(link_id_to_send, msg)) {
+    if (send_data(link_id_to_send, "M", msg)) {
       // succeeded in sending data
       return 1;
     }
@@ -351,8 +356,8 @@ int wifi_connect_to_ap(int ap_mac) {
       SEND_CMD_OK(cmd_buf);
       
       // send the AP your information
-      sprintf(data_buf, "CS,%d\n", module_mac);
-      if (send_data(link_id, data_buf)) {
+      sprintf(data_buf, "%d", module_mac);
+      if (send_data(link_id, "CS", data_buf)) {
         link_id_to_mac[link_id] = ap_mac;
         connected_ap_mac = ap_mac;
         return 1;

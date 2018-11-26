@@ -4,6 +4,7 @@ from routing import Routing
 from topology import Topology
 import threading
 import time
+from random import randint
 
 class TestWifi(threading.Thread):
     def __init__(self, port, id):
@@ -21,14 +22,15 @@ class TestWifi(threading.Thread):
         while(True):
             self.prt("Starting cycle")
             self.w.run()
-            self.t.run()
+            # self.t.run()
             self.prt(self.r.get_graph())
             s_time = time.time()
-            while(time.time() - s_time < 5):
+            while(time.time() - s_time < 5 + (randint(0, 20)/5)):
                 self.w.listen_for_lines()
     
 
-id = 1
+id = 2
 for port in glob.glob("/dev/cu.SLAB_USBtoUART*"):
-    TestWifi(port, id).start()
-    id+=1
+    if (port != "/dev/cu.SLAB_USBtoUART"):
+        TestWifi(port, id).start()
+        id+=1
