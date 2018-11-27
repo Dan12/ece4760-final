@@ -14,29 +14,6 @@ int routing_setup();
 
 void routing_register_recv_handler(void(*handler)(int mac, char* msg));
 
-typedef struct adj_node_entry {
-    int mac;
-    int type;
-} adj_node_entry;
-
-static adj_node_entry empty_adj_node_entry = {
- 0, 0   
-};
-
-#define MAX_NUM_CONNECTIONS 5
-
-typedef struct graph_entry {
-    int mac;
-    int seq_num;
-    adj_node_entry adj_nodes[MAX_NUM_CONNECTIONS];
-} graph_entry;
-
-/**
- * 
- * @return null terminated (mac) list of graph entries
- */
-graph_entry* routing_get_graph();
-
 /**
  * Send a message to the destination mac
  * @param dest_mac the mac to send the message to

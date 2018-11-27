@@ -109,6 +109,9 @@ class Topology(TopologyAPI):
         if connected_ap == None:
             max_stren = 0
             max_mac = None
+            print(self.router.get_direct_conns())
+            print(graph)
+            print(vis_mac_strns)
             for (mac, stren) in vis_mac_strns:
                 # filter out all the aps that are already connected to our AP and that are in our graph
                 if mac not in self.router.get_direct_conns() and mac not in graph:

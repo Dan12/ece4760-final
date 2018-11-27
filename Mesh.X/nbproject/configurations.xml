@@ -13,6 +13,7 @@
       <itemPath>logger.h</itemPath>
       <itemPath>routing.h</itemPath>
       <itemPath>topology.h</itemPath>
+      <itemPath>graph.h</itemPath>
     </logicalFolder>
     <logicalFolder name="LinkerScript"
                    displayName="Linker Files"
@@ -28,6 +29,7 @@
       <itemPath>wifi.c</itemPath>
       <itemPath>routing.c</itemPath>
       <itemPath>topology.c</itemPath>
+      <itemPath>graph.c</itemPath>
     </logicalFolder>
     <logicalFolder name="ExternalFiles"
                    displayName="Important Files"

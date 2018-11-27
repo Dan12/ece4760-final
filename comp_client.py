@@ -3,9 +3,9 @@ from routing import Routing
 from topology import Topology
 
 mesh_id = 1
-mesh_mac = "84:f3:eb:59:c2:ca"
+mesh_mac = "882931169"
 # mesh_id = 2
-# mesh_mac = "1a:fe:34:a0:75:e1"
+# mesh_mac = "-346438966"
 
 w = CompWifi(mesh_id, mesh_mac)
 r = Routing(w)

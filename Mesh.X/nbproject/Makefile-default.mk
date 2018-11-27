@@ -45,17 +45,17 @@ OBJECTDIR=build/${CND_CONF}/${IMAGE_TYPE}
 DISTDIR=dist/${CND_CONF}/${IMAGE_TYPE}
 
 # Source Files Quoted if spaced
-SOURCEFILES_QUOTED_IF_SPACED=main.c uart.c timer.c string_util.c wifi.c routing.c topology.c
+SOURCEFILES_QUOTED_IF_SPACED=main.c uart.c timer.c string_util.c wifi.c routing.c topology.c graph.c
 
 # Object Files Quoted if spaced
-OBJECTFILES_QUOTED_IF_SPACED=${OBJECTDIR}/main.o ${OBJECTDIR}/uart.o ${OBJECTDIR}/timer.o ${OBJECTDIR}/string_util.o ${OBJECTDIR}/wifi.o ${OBJECTDIR}/routing.o ${OBJECTDIR}/topology.o
-POSSIBLE_DEPFILES=${OBJECTDIR}/main.o.d ${OBJECTDIR}/uart.o.d ${OBJECTDIR}/timer.o.d ${OBJECTDIR}/string_util.o.d ${OBJECTDIR}/wifi.o.d ${OBJECTDIR}/routing.o.d ${OBJECTDIR}/topology.o.d
+OBJECTFILES_QUOTED_IF_SPACED=${OBJECTDIR}/main.o ${OBJECTDIR}/uart.o ${OBJECTDIR}/timer.o ${OBJECTDIR}/string_util.o ${OBJECTDIR}/wifi.o ${OBJECTDIR}/routing.o ${OBJECTDIR}/topology.o ${OBJECTDIR}/graph.o
+POSSIBLE_DEPFILES=${OBJECTDIR}/main.o.d ${OBJECTDIR}/uart.o.d ${OBJECTDIR}/timer.o.d ${OBJECTDIR}/string_util.o.d ${OBJECTDIR}/wifi.o.d ${OBJECTDIR}/routing.o.d ${OBJECTDIR}/topology.o.d ${OBJECTDIR}/graph.o.d
 
 # Object Files
-OBJECTFILES=${OBJECTDIR}/main.o ${OBJECTDIR}/uart.o ${OBJECTDIR}/timer.o ${OBJECTDIR}/string_util.o ${OBJECTDIR}/wifi.o ${OBJECTDIR}/routing.o ${OBJECTDIR}/topology.o
+OBJECTFILES=${OBJECTDIR}/main.o ${OBJECTDIR}/uart.o ${OBJECTDIR}/timer.o ${OBJECTDIR}/string_util.o ${OBJECTDIR}/wifi.o ${OBJECTDIR}/routing.o ${OBJECTDIR}/topology.o ${OBJECTDIR}/graph.o
 
 # Source Files
-SOURCEFILES=main.c uart.c timer.c string_util.c wifi.c routing.c topology.c
+SOURCEFILES=main.c uart.c timer.c string_util.c wifi.c routing.c topology.c graph.c
 
 
 CFLAGS=
@@ -136,6 +136,12 @@ ${OBJECTDIR}/topology.o: topology.c  nbproject/Makefile-${CND_CONF}.mk
 	@${RM} ${OBJECTDIR}/topology.o 
 	@${FIXDEPS} "${OBJECTDIR}/topology.o.d" $(SILENT) -rsi ${MP_CC_DIR}../  -c ${MP_CC}  $(MP_EXTRA_CC_PRE) -g -D__DEBUG -D__MPLAB_DEBUGGER_PK3=1 -fframe-base-loclist  -x c -c -mprocessor=$(MP_PROCESSOR_OPTION)  -MMD -MF "${OBJECTDIR}/topology.o.d" -o ${OBJECTDIR}/topology.o topology.c   
 	
+${OBJECTDIR}/graph.o: graph.c  nbproject/Makefile-${CND_CONF}.mk
+	@${MKDIR} "${OBJECTDIR}" 
+	@${RM} ${OBJECTDIR}/graph.o.d 
+	@${RM} ${OBJECTDIR}/graph.o 
+	@${FIXDEPS} "${OBJECTDIR}/graph.o.d" $(SILENT) -rsi ${MP_CC_DIR}../  -c ${MP_CC}  $(MP_EXTRA_CC_PRE) -g -D__DEBUG -D__MPLAB_DEBUGGER_PK3=1 -fframe-base-loclist  -x c -c -mprocessor=$(MP_PROCESSOR_OPTION)  -MMD -MF "${OBJECTDIR}/graph.o.d" -o ${OBJECTDIR}/graph.o graph.c   
+	
 else
 ${OBJECTDIR}/main.o: main.c  nbproject/Makefile-${CND_CONF}.mk
 	@${MKDIR} "${OBJECTDIR}" 
@@ -178,6 +184,12 @@ ${OBJECTDIR}/topology.o: topology.c  nbproject/Makefile-${CND_CONF}.mk
 	@${RM} ${OBJECTDIR}/topology.o.d 
 	@${RM} ${OBJECTDIR}/topology.o 
 	@${FIXDEPS} "${OBJECTDIR}/topology.o.d" $(SILENT) -rsi ${MP_CC_DIR}../  -c ${MP_CC}  $(MP_EXTRA_CC_PRE)  -g -x c -c -mprocessor=$(MP_PROCESSOR_OPTION)  -MMD -MF "${OBJECTDIR}/topology.o.d" -o ${OBJECTDIR}/topology.o topology.c   
+	
+${OBJECTDIR}/graph.o: graph.c  nbproject/Makefile-${CND_CONF}.mk
+	@${MKDIR} "${OBJECTDIR}" 
+	@${RM} ${OBJECTDIR}/graph.o.d 
+	@${RM} ${OBJECTDIR}/graph.o 
+	@${FIXDEPS} "${OBJECTDIR}/graph.o.d" $(SILENT) -rsi ${MP_CC_DIR}../  -c ${MP_CC}  $(MP_EXTRA_CC_PRE)  -g -x c -c -mprocessor=$(MP_PROCESSOR_OPTION)  -MMD -MF "${OBJECTDIR}/graph.o.d" -o ${OBJECTDIR}/graph.o graph.c   
 	
 endif
 
