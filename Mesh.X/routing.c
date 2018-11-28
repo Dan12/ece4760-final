@@ -232,6 +232,8 @@ void on_receive_bootstrap(int prev_mac, char* data) {
     int sta_seq_num = atoi(strp(&data, ","));
     int ap_mac = atoi(strp(&data, ","));
     
+    add_edge(ap_mac, sta_mac, sta_seq_num);
+    
     int found_conn = 0;
     // check if this connection exists on my side
     for (i = 0; i < MAX_NUM_NODES; i++) {

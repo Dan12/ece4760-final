@@ -12,10 +12,9 @@ int get_module_mac();
 
 /**
  * Setup the wifi module with the given id
- * @param id the id of the module (TODO make this the lsb of mac)
  * @return 1 if the setup succeeded, 0 else
  */
-int wifi_setup(char id);
+int wifi_setup();
 
 /**
  * Run post processing algorithms to maintain state. Should be run as often

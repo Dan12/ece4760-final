@@ -38,11 +38,11 @@ PING_TIME = 5000
 
 class WifiReal(WifiAPI):
 
-    def __init__(self, port, id, baud="115200"):
+    def __init__(self, port, baud="115200"):
         super(WifiReal, self).__init__(str(0))
 
         self.port = port
-        self.id = id
+        self.id = None
         self.ser = serial.Serial(port,baud, timeout=5)
         if self.ser.isOpen():
             self.ser.close()
@@ -93,9 +93,11 @@ class WifiReal(WifiAPI):
         self.serial.write_cmd("AT+CWMODE=3")
         # get mac
         result = safe_dec(self.serial.write_cmd("AT+CIPAPMAC_CUR?"))
-        self.mac = parse_mac(macRE.findall(result)[0])
+        mac_addr = macRE.findall(result)[0]
+        self.mac = parse_mac(mac_addr)
         # mac_lsb = int(self.mac[-2:], 16)
         self.prt(self.mac)
+        self.id = int(mac.split(":")[5],16)
         # set ip address to avoid conflicts
         self.ip = "192.168.{}.1".format(self.id)
         self.serial.write_cmd("AT+CIPAP_CUR=\"192.168.{}.1\",\"{}\",\"255.255.255.0\"".format(self.id, self.ip))

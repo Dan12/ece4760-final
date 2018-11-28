@@ -152,13 +152,25 @@ void process_data(int link_id, char* type, char* data) {
     sprintf(logbuff, "proc data: %d %s %s", link_id, type, data);
     comp_log("WIFI_DBG", logbuff);
     if (strcmp(type, "CS") == 0) {
-      int mac = parse_mac(data);
+      int mac = atoi(data);
       link_id_to_mac[link_id] = mac;
 
       ping(link_id);
 
-      if (connection_handler != NULL)
+      if (connection_handler != NULL) {
+        sprintf(logbuff, "connection: %d   my ap: %d", mac, module_mac);
+        comp_log("WIFI_DBG", logbuff);
+        if (connected_ap_mac == mac) {
+          comp_log("WIFI_DBG", "duplicate connection");
+          if (module_mac < mac) {
+            connected_ap_mac = 0;
+          } else {
+            comp_log("WIFI_DBG", "ignoring station connection");
+            return;
+          }
+        }
         connection_handler(mac);
+      }
     } else if (strcmp(type, "P") == 0) {
       time_to_ping[link_id] = time_tick_millsec + PING_MS;
     } else if (strcmp(type, "M") == 0) {
@@ -209,7 +221,7 @@ fill_read_buffer(); \
 comp_log("WIFI", read_buffer); \
 if (!most_recent_result) return 0;
 
-int wifi_setup(char id) {
+int wifi_setup() {
   // reset buffers
   int i;
   for(i = 0; i < MAX_CONNECTIONS; i++) {
@@ -239,6 +251,7 @@ int wifi_setup(char id) {
   module_mac = parse_mac(mac);
   sprintf(logbuff, "mod mac %d", module_mac);
   comp_log("WIFI_DBG", logbuff);
+  int id = module_mac & 0xff;
   
   // set local IP address to a different number
   sprintf(cmd_buf, "AT+CIPAP_CUR=\"192.168.%d.1\",\"192.168.%d.1\",\"255.255.255.0\"", id, id);
@@ -338,6 +351,7 @@ char* get_visible_ssid(int mac) {
     if (visible_macs[i].mac == mac) {
       return visible_macs[i].ssid;
     }
+    i++;
   }
   return NULL;
 }
@@ -363,6 +377,8 @@ int wifi_connect_to_ap(int ap_mac) {
     char* ap_ssid = get_visible_ssid(ap_mac);
     if (ap_ssid != NULL) {
       int ap_id = atoi(ap_ssid+13);
+      sprintf(logbuff, "wifi conn %s %d", ap_ssid, ap_id);
+      comp_log("WIFI_DBG", logbuff);
       sprintf(cmd_buf, "AT+CWJAP_CUR=\"%s\",\"1234567890\"", ap_ssid);
       SEND_CMD_OK(cmd_buf);
 

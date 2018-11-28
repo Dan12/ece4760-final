@@ -214,7 +214,7 @@ int find_reverse_edge() {
 
 void topology_run() {
   // if not connected to an ap, find a node not in the graph and connect to it
-  if (!wifi_get_connected_ap()) {
+  if (!routing_get_connected_ap()) {
     visible_mac* vis_macs = routing_get_visible_macs();
     int i = 0;
     int max_mac = 0;
@@ -233,9 +233,9 @@ void topology_run() {
     }
     
     if (max_mac) {
-      sprintf(log_buf, "Connecting to ap");
+      sprintf(log_buf, "Connecting to ap %d", max_mac);
       comp_log("TOPO", log_buf);
-      wifi_connect_to_ap(max_mac); 
+      routing_connect_to_ap(max_mac); 
     }
     return;
   }
