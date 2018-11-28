@@ -15,8 +15,11 @@ void peripheral_setup(){
 	// setting RB0 as an output and setting the output to zero for LED
 	mPORTBSetPinsDigitalOut(BIT_0);
 	mPortBClearBits(BIT_0);
-	// setting RB1 as an input for pushbutton
-	mPORTBSetPinsDigitalIn(BIT_1);
+	// setting RB1 as an output and seetting the output to zero for LED
+	mPortBClearBits(BIT_1);
+	mPortBClearBits(BIT_1);
+    //setting RB2 as an input 
+	mPORTBSetPinsDigitalIn(BIT_2);
 
 }
 
@@ -28,12 +31,18 @@ void peripheral_register_recv_handler(void(*handler)(int mac, char *msg)){
 void recieved_message(int from_mac, char* msg) {
 
 	char* type = strp(&msg, ",");
-  if (type[0] == 'L') {
-    if (recv_handler != NULL) {
-      recv_handler(from_mac, msg); 
+  if (recv_handler != NULL) {
+  	recv_handler(from_mac, msg); 
+    if (type[0] == 'L') {
+    	if(type[1] == '1'){
       mPortBSetBits(BIT_0);
+  }else if (type[1] == '2'){
+  	  mPortBSetBits(BIT_1);
+  }
     }
   }
+
+}
   
 
 
