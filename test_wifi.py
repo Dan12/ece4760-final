@@ -27,10 +27,11 @@ class TestWifi(threading.Thread):
             s_time = time.time()
             while(time.time() - s_time < 5 + (randint(0, 20)/5)):
                 self.w.listen_for_lines()
-    
 
-id = 2
-for port in glob.glob("/dev/cu.SLAB_USBtoUART*"):
-    if (port != "/dev/cu.SLAB_USBtoUART"):
-        TestWifi(port, id).start()
-        id+=1
+# id = 2
+# for port in glob.glob("/dev/cu.SLAB_USBtoUART*"):
+#     if (port != "/dev/cu.SLAB_USBtoUART"):
+#         TestWifi(port, id).start()
+#         id+=1
+
+TestWifi("COM4", 2).start()
