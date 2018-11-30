@@ -103,8 +103,8 @@ void link_id_disconnected(int link_id) {
   if (mac != 0) {
     if (mac == connected_ap_mac) {
       connected_ap_mac = 0;
-      link_id_to_mac[link_id] = 0;
     }
+    link_id_to_mac[link_id] = 0;
     
     if (disconnection_handler != NULL)
       disconnection_handler(mac);
@@ -305,7 +305,12 @@ int send_data(int link_id, char* type, char* data) {
   send_byte('\n', UART_ESP);
   
   fill_read_buffer();
-  if (!most_recent_result) return 0;
+  if (!most_recent_result) {
+    sprintf(logbuff, "Failed to send");
+    comp_log("WIFI_DBG", logbuff);
+//    link_id_disconnected(link_id);
+    return 0;
+  }
   
   return 1;
 }
@@ -339,9 +344,6 @@ int wifi_send_data(int dest_mac, char* msg) {
       return 1;
     }
   }
-  sprintf(logbuff, "Failed to send");
-  comp_log("WIFI_DBG", logbuff);
-  link_id_disconnected(mac_to_link_id(dest_mac));
   return 0;
 }
 
@@ -386,7 +388,7 @@ int wifi_connect_to_ap(int ap_mac) {
       sprintf(logbuff, "link id %d", link_id);
       comp_log("WIFI_DBG", logbuff);
       // set timeout to be 30 seconds, ping time is 5 seconds
-      sprintf(cmd_buf, "AT+CIPSTART=%d,\"TCP\",\"192.168.%d.1\",80,30", link_id, ap_id);
+      sprintf(cmd_buf, "AT+CIPSTART=%d,\"TCP\",\"192.168.%d.1\",80,60", link_id, ap_id);
       SEND_CMD_OK(cmd_buf);
       
       // send the AP your information
@@ -407,7 +409,7 @@ int wifi_connect_to_ap(int ap_mac) {
  */
 void wifi_disconnect_from_ap() {
   if (connected_ap_mac != 0) {
-    int link_id_to_close = link_id_to_mac[connected_ap_mac];
+    int link_id_to_close = mac_to_link_id(connected_ap_mac);
     if (link_id_to_close != -1) {
       send_cmd("AT+CIPCLOSE", UART_ESP); 
       fill_read_buffer();

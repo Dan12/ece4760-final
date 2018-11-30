@@ -44,6 +44,18 @@ void __ISR(_TIMER_1_VECTOR, IPL2AUTO) Timer1Handler(void) {
     pinMode = !pinMode;
 }
 
+void rec_msg(int from_mac, char* msg) {
+  comp_log("APP", "Got message");
+  comp_log("APP", msg);
+  if (msg[0] == 'L') {
+    if (msg[1] == '1') {
+      mPORTBSetBits(BIT_0);
+    } else {
+      mPORTBClearBits(BIT_0);
+    }
+  }
+}
+
 int main(void) {
   
   init_system();
@@ -64,6 +76,10 @@ int main(void) {
   
   mPORTASetBits(BIT_0);
   
+  // setting RB0 as an output and setting the output to zero for LED
+	mPORTBSetPinsDigitalOut(BIT_0);
+	mPORTBClearBits(BIT_0);
+  
   comp_log("APP", "starting system");
   
   if (wifi_setup()) {
@@ -72,6 +88,7 @@ int main(void) {
     comp_log("APP", "failed setup");
     
     WritePeriod1(0xffff/4);
+    send_cmd("AT+RST", UART_ESP);
     // Error blinking
     while(1);
   }
@@ -79,6 +96,8 @@ int main(void) {
   routing_setup();
   
   topology_setup();
+  
+  topology_register_recv_handler(rec_msg);
   
   while(1) {
     wifi_run();

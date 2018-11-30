@@ -9,4 +9,4 @@ esptool.py -p /dev/cu.SLAB_USBtoUART write_flash \
 0x01000 atbin1.6/bin/at/512+512/user1.1024.new.2.bin \
 # 0xfc000 atbin1.6/bin/esp_init_data_default_v08.bin \
 0x7e000 atbin1.6/bin//blank.bin \
-0xfe000 atbin1.6/bin//blank.bin
+0xfe000 atbin1.6/bin//blank.bin \

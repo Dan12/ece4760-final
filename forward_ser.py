@@ -1,6 +1,6 @@
 import serial
 
-port = "/dev/cu.SLAB_USBtoUART73"
+port = "/dev/cu.SLAB_USBtoUART"
 baud = "9600"
 
 ser = serial.Serial(port,baud)

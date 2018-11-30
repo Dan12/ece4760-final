@@ -8,7 +8,11 @@
 
 static void(*recv_handler)(int mac, char* msg);
 
+char log_buf[256];
+
 void received_message(int from_mac, char* msg) {
+  sprintf(log_buf, "From %d got %s", from_mac, msg);
+  comp_log("TOPO", log_buf);
   char* type = strp(&msg, ",");
   if (type[0] == 'M') {
     if (recv_handler != NULL) {
@@ -86,7 +90,11 @@ int is_in_visited(int mac) {
  * that module_mac is in
  */
 int is_in_cycle(int mac) {
+  sprintf(log_buf, "Mac in cycle? %d", mac);
+  comp_log("TOPO", log_buf);
   if (!is_in_visited(mac)) {
+    sprintf(log_buf, "Not visited %d", mac);
+    comp_log("TOPO", log_buf);
     visited[visited_idx++] = mac;
     graph_entry* entry = get_graph_entry(mac);
     if (entry->mac == mac) {
@@ -97,6 +105,8 @@ int is_in_cycle(int mac) {
           // result is 
           int result = is_in_cycle(entry->adj_nodes[i].mac);
           if (result) {
+            sprintf(log_buf, "Found a cycle with min mac %d", result);
+            comp_log("TOPO", log_buf);
             if (result < mac) {
               return result;
             }
@@ -119,6 +129,10 @@ int cycle_should_disconnect() {
   }
   
   int cycle_min = is_in_cycle(get_module_mac());
+  sprintf(log_buf, "Cycle min %d", cycle_min);
+  comp_log("TOPO", log_buf);
+  sprintf(log_buf, "My mac %d", get_module_mac());
+  comp_log("TOPO", log_buf);
   if (cycle_min && cycle_min == get_module_mac()) {
     return 1;
   }
@@ -207,8 +221,8 @@ int find_path(graph_entry* entry, int end_mac, int i) {
 }
 
 int find_reverse_edge() {
-  
-  int i;
+  int rev_mac = find_reversable_mac();
+  find_path(get_graph_entry(rev_mac), get_module_mac(), 0);
   
 }
 
@@ -219,12 +233,12 @@ void topology_run() {
     int i = 0;
     int max_mac = 0;
     int max_stren = -1;
-    static char log_buf[256];
     while(vis_macs[i].mac) {
       sprintf(log_buf, "Vis mac: %d %s %d", vis_macs[i].mac, vis_macs[i].ssid, vis_macs[i].strength);
       comp_log("TOPO", log_buf);
       if (!mac_in_direct_conns(vis_macs[i].mac) && !mac_in_graph(vis_macs[i].mac)) {
-        if (max_stren == -1 || vis_macs[i].strength > max_stren) {
+        // closer strength is to 0 -> stronger signal
+        if (max_stren == -1 || vis_macs[i].strength < max_stren) {
           max_stren = vis_macs[i].strength;
           max_mac = vis_macs[i].mac;
         } 
@@ -241,8 +255,8 @@ void topology_run() {
   }
   
 //  Run no cycle algorithm
-//  if (cycle_should_disconnect()) {
-//    routing_disconnect_from_ap();
-//    return;
-//  }
+  if (cycle_should_disconnect()) {
+    routing_disconnect_from_ap();
+    return;
+  }
 }

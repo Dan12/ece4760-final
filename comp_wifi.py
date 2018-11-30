@@ -67,23 +67,28 @@ class CompWifi(WifiAPI):
         return [(self.vis_mac, 1)]
 
     def ping(self):
-        self.send_over_socket("P,{}\n".format(5000))
+        self.send_over_socket(self.ap_mac, "P,{}\n".format(5000))
 
     def run(self):
         if self.client:
-            data = self.client.recv(4096).decode('utf-8', errors='ignore')
+            if self.to_ping != 0 and self.to_ping < datetime.datetime.now().timestamp():
+                self.to_ping = 0
+                self.ping()
+
+            self.client.settimeout(5.0)
+            try:
+                data = self.client.recv(4096).decode('utf-8', errors='ignore')
+            except:
+                return
             self.prt(data)
-            packets = data.split(",")
+            packets = data[:-1].split(",")
             self.prt("RECV packets: {}".format(packets))
             if len(packets) < 1:
                 return
 
             # ping packet to keep connection alive
             if packets[0] == "P":
-                self.to_ping = (datetime.datetime.now().timestamp()+int(packets[1]))
+                self.to_ping = (datetime.datetime.now().timestamp()+int(packets[1])/1000)
             elif packets[0] == "M":
                 if self.on_recv_handler:
                     self.on_recv_handler(self.ap_mac, ",".join(packets[1:]))
-            
-            if self.to_ping != 0 and self.to_ping < datetime.datetime.now().timestamp():
-                self.ping()

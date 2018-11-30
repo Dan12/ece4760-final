@@ -368,6 +368,10 @@ int get_next_hop(int dest_mac) {
   int queue_read = 0;
   int queue_write = 0;
   int visited[MAX_NUM_NODES];
+  int j;
+  for(j = 0; j < MAX_NUM_NODES; j++) {
+    visited[j] = 0;
+  }
   int module_mac = get_module_mac();
   graph_entry* init_node = get_graph_entry(module_mac);
   // make sure node is in graph
