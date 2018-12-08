@@ -1,0 +1,53 @@
+.masthead h1 {
+  color: white;
+  text-shadow:
+   -1px -1px 0 #000,  
+    1px -1px 0 #000,
+    -1px 1px 0 #000,
+     1px 1px 0 #000;
+  background: none;
+  -webkit-text-fill-color: white;
+}
+
+#mainNav.navbar-shrink {
+  background-color: #eee;
+}
+
+body {
+  letter-spacing: initial;
+}
+
+#projects {
+  font-family: Lora,'Times New Roman',serif;
+}
+
+.mt-4 {
+  font-weight: bold;
+}
+
+h3 {
+  font-style: italic;
+}
+
+b {
+  font-weight: bold;
+}
+
+p.lead {
+  text-indent: 2em;
+}
+
+.tg-0pky {
+  border: 1px solid black;
+  padding: 0 6px;
+}
+
+p.cap {
+  text-align: center;
+  text-indent: 0;
+  font-size: 1rem;
+}
+
+.row img {
+  width: 100%;
+}

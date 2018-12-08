@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="en">
+
+  <head>
+
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+    <meta name="description" content="">
+    <meta name="author" content="">
+
+    <title>ECE4760 Final Project</title>
+
+    <!-- Bootstrap core CSS -->
+    <link href="vendor/bootstrap/css/bootstrap.min.css" rel="stylesheet">
+
+    <!-- Custom fonts for this template -->
+    <link href="vendor/fontawesome-free/css/all.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css?family=Varela+Round" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css?family=Nunito:200,200i,300,300i,400,400i,600,600i,700,700i,800,800i,900,900i" rel="stylesheet">
+
+    <!-- Custom styles for this template -->
+    <link href="css/grayscale.min.css" rel="stylesheet">
+    <link href="css/tweaks.css" rel="stylesheet">
+
+  </head>
+
+  <body id="page-top">
+
+    <!-- Navigation -->
+    <nav class="navbar navbar-expand-lg navbar-light fixed-top" id="mainNav">
+      <div class="container">
+        <a class="navbar-brand js-scroll-trigger" href="#page-top">ECE 4760 Final Project</a>
+        <button class="navbar-toggler navbar-toggler-right" type="button" data-toggle="collapse" data-target="#navbarResponsive" aria-controls="navbarResponsive" aria-expanded="false" aria-label="Toggle navigation">
+          Menu
+          <i class="fas fa-bars"></i>
+        </button>
+        <div class="collapse navbar-collapse" id="navbarResponsive">
+          <ul class="navbar-nav ml-auto">
+            <li class="nav-item">
+              <a class="nav-link js-scroll-trigger" href="#high">High Level Design</a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link js-scroll-trigger" href="#hardware">Hardware Design</a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link js-scroll-trigger" href="#software">Software Design</a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link js-scroll-trigger" href="#results">Results</a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link js-scroll-trigger" href="#conc">Conclusions</a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link js-scroll-trigger" href="#app">Appendix</a>
+            </li>
+          </ul>
+        </div>
+      </div>
+    </nav>
+
+    <!-- Header -->
+    <header class="masthead">
+      <div class="container d-flex h-100 align-items-center">
+        <div class="mx-auto text-center">
+          <h1 class="mx-auto my-0 text-uppercase">Self Organizing Wifi Mesh Network</h1>
+          <h2 class="text-white-50 mx-auto mt-2 mb-5">Daniel Weber and Michael Rodriguez</h2>
+        </div>
+      </div>
+    </header>
+
+    <!-- About Section -->
+    <section id="overview" class="about-section text-center">
+      <div class="container">
+        <div class="row">
+          <div class="col-lg-8 mx-auto">
+            <h2 class="text-white mb-4">Overview</h2>
+            <p class="text-white-50">In this project, we create a mesh network of PIC32 microcontrollers connected using ESP8266 wifi modules. The mesh network is able to fully connect itself through a variety of graph topology algorithms and is able to route packets through the network using a shortest path approach. It also exposes a very simple application layer that can be extended to a virtually unlimited set of networked ideas.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Projects Section -->
+    <section id="projects" class="projects-section bg-white">
+      <div class="container">
+
+        <div class="row">
+          <div class="col-lg-8">
+              <h2 id="high" class="mt-4">High Level Design</h2>
+                <p class="lead">
+                    The primary motivation for this project was to create an offline distributed communication system that was robust to connectivity changes and required no manual intervention to set up. In order to do this effectively, we needed wireless devices that could scan for other wireless devices and connect to multiple wireless devices at once. We considered several different types of wireless devices, including bluetooth modules and radios. However, the bluetooth modules weren’t really able to connect with multiple devices at once and the radios could only be set up as broadcast stations or receivers, so there would have likely been significant packet drop, as described in <a href="http://people.ece.cornell.edu/land/courses/ece4760/FinalProjects/f2016/bac239_aw528_rk534/bac239_aw528_rk534/bac239_aw528_rk534/index.html">this</a> project report. We settled on wifi modules, specifically the ESP8266 modules, since they met most of the requirements for this project and had a relatively long range.
+                  </p>
+                  <p class="lead">
+                    The general logical structure of our design was to create layers of hardware that were each responsible for a different level of abstraction, similar to the way the OSI model is organized. This meant that once we had defined the connections/API between each of the layers in our project, we could work on each piece individually and then bring it all together in the end. Some of the main tradeoffs that we made were at the software level between well established algorithms and custom algorithms. The main tradeoff was between using the Ad-hoc On-demand Distance Vector (AODV) routing algorithm or a custom algorithm for routing messages between nodes. Some of the data points that factored into our decision was ease of implementation and relevancy to the goal of the project. We eventually decided that while a custom routing algorithm would require extra theoretical development, it would work better than AODV in terms of what we wanted out of this project.
+                </p>
+              <h2 id="hardware" class="mt-4">Hardware Design</h2>
+                <p class="lead">
+                  Lorem ipsum dolor sit amet, consectetur adipisicing elit. Ducimus, vero, obcaecati, aut, error quam sapiente nemo saepe quibusdam sit excepturi nam quia corporis eligendi eos magni recusandae laborum minus inventore?
+                </p>
+                <h3>ESP8266 Firmware Flashing</h3>
+                <p class="lead">
+                  In order to get the most up to data AT commands working on the ESP8266 modules, we decided to flash the latest firmware from Espressif. In order to do this, we had to add a button to reset the ESP8266 module by pulling the reset pin low and add a button to pull the GPIO_0 pin from floating to low. This put the module in a state to be programmed. We then used the firmware flashing feature of Espressif’s esptool python script to flash the firmware to the modules through the USB to UART cable.
+                </p>
+              <h2 id="software" class="mt-4">Software Design</h2>
+                <p class="lead">
+                    The software design was largely influence by the constraints of the hardware we were working with, namely the ESP8266 wifi modules. Wifi devices are typically either configured as stations or access points. A station is a device like your computer, which can connect to one wifi network at a time. An access point is something like a router, which allows many stations to connect to it and acts as a kind of local hub for connecting wifi devices. The ESP8266 wifi modules actually allow a third mode which is a hybrid of the two. A single chip can act as both a station and an access point. However, it limits the total number of connects to 5. 4 connections to its access point and its one station connection.
+                </p>
+                <p class="lead">
+                    These connectivity restrictions inform the kind of mesh network we can create. Since the number of edges in the network is limited to the number of devices (since a station can only connect to a single access point) we can’t really make a very fault tolerant network. Therefore, we decided to focus on software that tries to connect as many of the devices as possible in a fully connected mesh. Although not rigorously proven, we believe that the algorithms we designed allow for the maximum number of nodes to be connected in an arbitrary mesh configuration. In order to accomplish this, we split the software into 4 logically separate layers: Wifi, Routing, Topology, and Application.
+                </p>
+                <h3>Wifi Layer</h3>
+                  <p class="lead">
+                      At the bottom of the stack we have the wifi layer. This layer was responsible for communicating with the ESP8266 and exposing a simplified wifi API to the software layer above. The communication with the wifi module was done over UART. Since it was very important to not lose any information from the wifi module, we used DMA to receive the data from UART into a buffer. This was done by storing a large ring buffer in memory which was written to on a UART_RX_IRQ. In order to keep track of the head of the ring buffer, we also set up an interrupt to fire on cell transfer, which simply increments a write pointer with wrap around. When we wanted to read wifi data, we busy wait until the write pointer advances past the read pointer and then update the read pointer as we read. The full code for this can be found in the <a href="https://github.com/Dan12/ece4760-final/blob/master/Mesh.X/uart.c">uart.c</a> file.
+                  </p>
+                  <p class="lead">
+                    The wifi layer is mainly concerned with setting up the wifi module and handling connections and disconnections from stations and access points. When it sets up the wifi module, the wifi layer reads the module’s mac address and assigns itself a unique ID and IP address based on the mac address. It then sets up a TCP server at the IP address and broadcasts itself to other wifi modules by setting its name to “ESP8266-Mesh-<ID>”. It then exposes a way to scan for other mesh devices to the above layer. It also exposes a way to connect to an access point, disconnect from an access point, get a list of the direct neighbors that the device is connected to, and a way to register a handler for when a different mesh device connects to its access point.
+                  </p>
+                <h3>Routing Layer</h3>
+                  <p class="lead">
+                      The layer above the wifi layer is the routing layer. This layer was concerned with maintaining a device’s current view of the network. This view took the form of a graph. We considered using the AODV algorithm to maintain routes between nodes. However, we realized that since we wanted to construct a network graph for each node that we would have a lot of unnecessary messages going through the network. Therefore, we decided that our routing algorithm would be a custom algorithm that allowed each node to construct a graph of the mesh network. This algorithm was inspired by some of the ideas that were presented in the AODV specification: specifically the idea of node sequence numbers and flood messages. The algorithm is primarily concerned with connection creation and destruction.
+                    </p>
+                    <p class="lead">
+                      When station S connects to access point A, node A sends S a bootstrap packet. This bootstrap packet contains node A’s current graph. Node S will then figure out the differences between A’s graph and its own graph. It will then flood the new edges from A to its side of the network and flood the edges from S’s side of the network to A. Finally, it will flood the S-A edge to the whole network.
+                    </p>
+                    <p class="lead">
+                      As a concrete example, consider the following scenario. Node T is connected to node S and node A is connected to node B. So nodes T and S see the network graph as an edge connecting each other and nodes A and B see the network graph as an edge connecting each other. Node S connects to node A, and the messages look like so:
+                    </p>
+                    <img src="img/message.png">
+                    <p class="lead">
+                      After the flood of messages has subsided, all 4 nodes in the network know about all 3 edges in the fully connected network and they are all able to produce the same graph. When two nodes disconnect from each other they both flood their respective sides of the network with an edge removal message. This allows each node in the network to update its graph to reflect the removed edge.
+                    </p>
+                    <p class="lead">
+                      In order to stop flood messages from infinitely propagating throughout the network we use the concept of sequence numbers. Each node maintains its own monotonically increasing sequence number, which it increases with each message that it creates. Every flood message has an origin node and the sequence number of that origin node when the flood message was created. Each node keeps track of the highest sequence number that it has seen from each node in the network. When a node sees a new message from origin node O with sequence number N, it checks to see if N is greater than the largest sequence number previously seen from O. If it is, then the node accepts the message and updates the largest sequence number to N. Otherwise, the node discards the message.
+                    </p>
+                    <p class="lead">
+                      Since all of the connections between nodes are TCP connections, we guarantee in order delivery and successful transmission (unless disconnection) of all packets between nodes. Due to this property, we can make some claims about the eventual consistency of the state of each node. We can guarantee that each node will eventually see the correct view of the network, even if edges are created and destroyed elsewhere in the network. As shown in the above diagram, edge creation messages are flooded by the station. Edge deletion messages will be flooded by both endpoints. However, in order to keep the network consistent, the access point will flood the edge removal as if it is coming from the station (by setting the originating node to the station and the sequence number to the sequence number of the station node). This means that whenever the station wants to increment its sequence number, it needs to let that access point it is connect to know about the increment. Since all edge modification events appear to come from the station connection, there is never a case where a node receives an inconsistent message based on its message history. Additionally, when a station receives a bootstrap message, it broadcasts the edge creation messages as if they had come from the original stations, meaning that when two node partitions are finally connected they will receive all of the edge creation messages as if they were just sent.
+                  </p>
+                <h3>Topology Layer</h3>
+                  <p class="lead">
+                      The layer on top of the routing layer is the topology layer. In actuality, this layer behaves more like a companion layer to the routing layer (i.e. acts at the same level of abstraction). Its job is to organize the nodes of the network so that the network can be as connected as possible. This involves running 3 algorithms: the no cycle algorithm, the edge reversal algorithm, and the sparse connection algorithm.	The no cycle algorithm ensures that there are no cycles in the network. This is because the edge reversal algorithm will require that the network graph have no cycles. The no cycle algorithm inspects a node’s current network graph and determines if there is a cycle in the graph that it is a part of. If it finds one, the node will disconnect from its access point if it is the lowest ID node in the cycle. The last condition makes it so that all the nodes in the cycle agree on which node will disconnect; otherwise every node will disconnect and the whole mesh will have to be reconstructed.
+                    </p>
+                    <img src="img/loop.png">
+                    <p class="lead cap">
+                      Every node will see that it is in a cycle, but node 15 will disconnect from node 21 since node 15 has the smallest ID.
+                    </p>
+                    <p class="lead">
+                      The edge reversal algorithm is necessary because the network could inadvertently partition itself. As a simple toy example, assume we have nodes A, B, C, and D. Nodes A and B can see each other, nodes B and C can see each other, and nodes C and D can see each other. Assume that node B connects to node A and node C connects to node D. Since each node can only have a single station connection, the network is now partitioned, as shown below:
+                    </p>
+                    <img src="img/rev_1.png">
+                    <p class="lead">
+                        Then a node N that runs the edge reversal algorithm looks for nodes which are visible to N but not in N’s graph. If such a node exists, N tries to find a reversible path in its graph, which is a path ending in a node with out degree 0. It will then tell every node along that path to disconnect from its access point and connect to the previous node in the path. After this is done, the network will still have the same connectivity and now N will have out degree 0, meaning it can connected to the node that was visible but not in the network. In the above network, let's assume that B completed the edge reversal process first. Then the resulting network will look like so:
+                      </p>
+                      <img src="img/rev_2.png">
+                      <p class="lead">
+                        Finally, the sparse connection algorithm attempts to remedy the 5 connection limit imposed on the wifi modules. As a motivating example, assume the network has the following configuration and that modules are limited to 3 connections:
+                      </p>
+                      <img src="img/sp_1.png">
+                      <p class="lead">
+                      Now assume a 5th node, node E comes online in the following position:
+                    </p>
+                    <img src="img/sp_2.png">
+                    <p class="lead">
+                        Node E wants to connect to node B, but node B already has 3 connections, so it will refuse the connection. However, we can still fully connect the network if A makes a connection to D instead. The way that A does this is that it realizes that node B has a large in degree and that A sees another node that is in the network (D). A will then choose to disconnect from node B and connect to node D in order to decrease the in degree of node B. Then, node E can connect to node B and we now have a fully connected network.
+                  </p>
+                  <img src="img/sp3.png">
+              <h2 id="results" class="mt-4">Results</h2>
+                <p class="lead">
+                    Overall, the hardware performed very well. The boards that we created had no issues and reliably connected the ESP8266 modules, the PIC32, and then UART to USB cable. The main issue that we had with the software was that modules would often disconnect when more than a few modules were present in the network. This may have been due to the quick timeout time (30 seconds for the TCP connection) and the large delay that we introduced to aid debugging (5 seconds per cycle). Additionally, sometimes the wifi modules would not be able to see the other wifi modules on their scan, even when they were very close. Furthermore, sometimes the wifi modules would fail to set up immediately on power up. A hard reset of the wifi module would usually resolve these issues, but we still don’t know what the reasons were for the issues.
+                </p>
+                <p class="lead">
+                    Another issue with the modules was that the modules often didn’t report a connection closure when we turned off a wifi module. This resulted in long periods of time where the network graph was inconsistent. It also made it very difficult to demo the “self healing” properties of our network as its behavior wasn’t as consistent as we liked. We were however able to successfully test that removing a module eventually resulted in a correct graph.
+                </p>
+                <p class="lead">
+                    Unfortunately, the inconsistency of the modules meant the we couldn’t test some of the algorithms described in the topology on the actual hardware. We were able to simulate some of the hardware’s behaviour in a python script. This allowed us to create a simulated environment for the algorithms to work in. In this simulated environment we were able to test and verify the correctness of the topology algorithms. This simulation code can be found <a href="https://github.com/Dan12/ece4760-final">here</a>
+                </p>
+              <h2 id="conc" class="mt-4">Conclusions</h2>
+                <p class="lead">
+                    Overall, we were quite pleased with the outcome of our work. We were able to meet our initial goals and made some very interesting software along the way. The simulation system that we developed for quick mesh algorithm testing was invaluable during development of the code base and with some improvements could become a more viable method of simulating various mesh network algorithms. While the final C code base is quite good, there are some algorithmic improvements that could be made to increase the stability of the network under disconnections.                  
+                </p>
+                <p class="lead">
+                    One consideration for future work on this project is that the routing algorithm likely does not scale to a large number of nodes as each node needs to know about the existence of every other node. Testing would have to be done to determine if something like AODV would be more suitable for larger mesh networks.
+                </p>
+                <h3>IP Considerations</h3>
+                  <p class="lead">
+                    All of the code that was written for the final PIC32 microcontroller was built from the ground up without any external libraries. The firmware and firmware flashing tools were all obtained from Espressif, which releases all of their tools under the MIT license, which allows us to freely use their software in this project. While the final algorithms were influenced by some of the ideas in the AODV specification, the specification is freely available online and its ideas are free to use. While we didn’t do much research into wifi based mesh network algorithms, we believe that this project may contain publishable algorithms and ideas.
+                  </p>
+                <h3>Ethical Considerations</h3>
+                  <p class="lead">
+                    In regards to the IEEE Code of Ethics, we feel like this project does uphold the safety and welfare of the public and was not made with the harmful intent. This project was created to increase our technical competence in a variety of software and hardware related fields and we hope that our results can be useful to future researchers and academics exploring similar problems. We maintain that any claims made in this writeup are substantiated through physical testing of our project and simulation of our algorithms.
+                  </p>
+                <h3>Legal Considerations</h3>
+                  <p class="lead">
+                    The ESP8266 module is fully compliant with FCC rules and regulations.  
+                  </p>
+              <h2 id="app" class="mt-4">Appendix</h2>
+                <h3>Appendix A</h3>
+                  <p class="lead">
+                    <b>The group approves this report for inclusion on the course website.</b>
+                  </p>
+                  <p class="lead">
+                    <b>The group approves the video for inclusion on the course youtube channel.</b>
+                  </p>
+                <h3>Appendix B</h3>
+                <p class="lead">
+                  A fully commented listing of the code can be found on our <a href="https://github.com/Dan12/ece4760-final/tree/master/Mesh.X">github</a>
+                </p>
+                <h3>Appendix C</h3>
+                <p class="lead">
+                  Schematics can be found in the hardware section
+                </p>
+                <h3>Appendix D</h3>
+                <p class="lead">
+                  Cost breakdown:
+                </p>
+                <table class="tg">
+                    <tr>
+                      <th class="tg-0pky">Item</th>
+                      <th class="tg-0pky">Cost</th>
+                      <th class="tg-0pky">Quantity</th>
+                      <th class="tg-0pky">Total Cost</th>
+                    </tr>
+                    <tr>
+                      <td class="tg-0pky">ESP8266</td>
+                      <td class="tg-0pky">3</td>
+                      <td class="tg-0pky">5.35</td>
+                      <td class="tg-0pky">16.05</td>
+                    </tr>
+                    <!-- <tr>
+                      <td class="tg-0pky">IR distance sensors</td>
+                      <td class="tg-0pky">7</td>
+                      <td class="tg-0pky">3</td>
+                      <td class="tg-0pky">21</td>
+                    </tr>
+                    <tr>
+                      <td class="tg-0pky">Camera</td>
+                      <td class="tg-0pky">14</td>
+                      <td class="tg-0pky">1</td>
+                      <td class="tg-0pky">14</td>
+                    </tr>
+                    <tr>
+                      <td class="tg-0pky">Servos</td>
+                      <td class="tg-0pky">13</td>
+                      <td class="tg-0pky">2</td>
+                      <td class="tg-0pky">26</td>
+                    </tr>
+                    <tr>
+                      <td class="tg-0pky">Arduino Uno</td>
+                      <td class="tg-0pky">16</td>
+                      <td class="tg-0pky">1</td>
+                      <td class="tg-0pky">16</td>
+                    </tr>
+                    <tr>
+                      <td class="tg-0pky">atmega328p</td>
+                      <td class="tg-0pky">4.30</td>
+                      <td class="tg-0pky">1</td>
+                      <td class="tg-0pky">4.30</td>
+                    </tr>
+                    <tr>
+                      <td class="tg-0pky">lm358</td>
+                      <td class="tg-0pky">0.60</td>
+                      <td class="tg-0pky">1</td>
+                      <td class="tg-0pky">0.60</td>
+                    </tr>
+                    <tr>
+                      <td class="tg-0pky">Perf board</td>
+                      <td class="tg-0pky">2.00</td>
+                      <td class="tg-0pky">2</td>
+                      <td class="tg-0pky">4.00</td>
+                    </tr>
+                    <tr>
+                      <td class="tg-0pky">IR hat</td>
+                      <td class="tg-0pky">2.00</td>
+                      <td class="tg-0pky">1</td>
+                      <td class="tg-0pky">2.00</td>
+                    </tr> -->
+                    <tr>
+                      <td class="tg-0pky">Total</td>
+                      <td class="tg-0pky"></td>
+                      <td class="tg-0pky"></td>
+                      <td class="tg-0pky">96.90</td>
+                    </tr>
+                  </table>
+                <h3>Appendix E</h3>
+                <p class="lead">
+                  Task Breakdown:
+                  <br>
+                  Daniel Weber:
+                  <br>
+                  Mesh software and algorithms
+                  <br>
+                  Michael Rodriguez:
+                  <br>
+                  Hardware and peripherals
+                </p>
+                <h3>Appendix F</h3>
+                <p class="lead">
+                    References:
+                    <br>
+                    <a href="https://www.espressif.com/sites/default/files/documentation/4a-esp8266_at_instruction_set_en.pdf">AT command reference</a>
+                    <br>
+                    <a href="https://github.com/espressif/esptool">Esp flashing code</a>
+                    <br>
+                    <a href="https://www.espressif.com/en/support/download/at?keys=&field_type_tid%5B%5D=14">Esp firmware</a>
+                    <br>
+                    <a href="https://www.ietf.org/rfc/rfc3561.txt">AODV specification</a>
+                    <br>
+                    <a href="https://startbootstrap.com/template-overviews/grayscale/">Website template</a>
+                    <br>
+                    <a href="http://people.ece.cornell.edu/land/courses/ece4760/FinalProjects/f2016/bac239_aw528_rk534/bac239_aw528_rk534/bac239_aw528_rk534/index.html">Radio Mesh Network Project</a>
+                </p>
+              
+          </div>
+          
+        </div>
+
+      </div>
+    </section>
+
+    <!-- Contact Section -->
+    <section class="contact-section bg-black">
+      <div class="container">
+
+        <div class="social d-flex justify-content-center">
+          <a href="https://github.com/Dan12/ece4760-final" class="mx-2">
+            <i class="fab fa-github"></i>
+          </a>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="bg-black small text-center text-white-50">
+      <div class="container">
+        Copyright &copy; Cornell 2018
+      </div>
+    </footer>
+
+    <!-- Bootstrap core JavaScript -->
+    <script src="vendor/jquery/jquery.min.js"></script>
+    <script src="vendor/bootstrap/js/bootstrap.bundle.min.js"></script>
+
+    <!-- Plugin JavaScript -->
+    <script src="vendor/jquery-easing/jquery.easing.min.js"></script>
+
+    <!-- Custom scripts for this template -->
+    <script src="js/grayscale.min.js"></script>
+
+  </body>
+
+</html>
