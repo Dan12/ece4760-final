@@ -92,9 +92,28 @@
                     The primary motivation for this project was to create an offline distributed communication system that was robust to connectivity changes and required no manual intervention to set up. In order to do this effectively, we needed wireless devices that could scan for other wireless devices and connect to multiple wireless devices at once. We considered several different types of wireless devices, including bluetooth modules and radios. However, the bluetooth modules weren’t really able to connect with multiple devices at once and the radios could only be set up as broadcast stations or receivers, so there would have likely been significant packet drop, as described in <a href="http://people.ece.cornell.edu/land/courses/ece4760/FinalProjects/f2016/bac239_aw528_rk534/bac239_aw528_rk534/bac239_aw528_rk534/index.html">this</a> project report. We settled on wifi modules, specifically the ESP8266 modules, since they met most of the requirements for this project and had a relatively long range.
                   </p>
                   <p class="lead">
-                    The general logical structure of our design was to create layers of hardware that were each responsible for a different level of abstraction, similar to the way the OSI model is organized. This meant that once we had defined the connections/API between each of the layers in our project, we could work on each piece individually and then bring it all together in the end. Some of the main tradeoffs that we made were at the software level between well established algorithms and custom algorithms. The main tradeoff was between using the Ad-hoc On-demand Distance Vector (AODV) routing algorithm or a custom algorithm for routing messages between nodes. Some of the data points that factored into our decision was ease of implementation and relevancy to the goal of the project. We eventually decided that while a custom routing algorithm would require extra theoretical development, it would work better than AODV in terms of what we wanted out of this project.
+                    The general logical structure of our design was to create layers of hardware that were each responsible for a different level of abstraction, similar to the way the OSI model is organized. This meant that once we had defined the connections/API between each of the layers in our project, we could work on each piece individually and then bring it all together in the end. Some of the main tradeoffs that we made were at the software level between well established algorithms and custom algorithms. The main tradeoff was between using the Ad-hoc On-demand Distance Vector (AODV) routing algorithm or a custom algorithm for routing messages between nodes. Some of the data points that factored into our decision were ease of implementation and relevancy to the goal of the project. We eventually decided that while a custom routing algorithm would require extra theoretical development, it would work better than AODV in terms of what we wanted out of this project.
                 </p>
               <h2 id="hardware" class="mt-4">Hardware Design</h2>
+                <p class="lead">
+                  The node consisted primarily of two key components: the PIC32 microcontroller and the ESP8266 wifi module. Given our previous experience throughout the course with the PIC32 microcontroller, the PIC32 proved to be an inexpensive, powerful chip that would allow us to meet the demands of network. For those reasons, the PIC32MX250F128B was selected to be used within our nodes. On the other hand, the ESP8266 wifi-module is a component that is known for its versatility, cost-effectiveness, and powerful capabilities. For these reasons, we also concluded that the ESP8266 would provide great functionality to the node. The nodes were designed to be as compact as possible to minimize the usage, and cost, of using a perfboard. 
+                </p>
+                <p class="lead">
+                  The PIC32 and the ESP8266 both require a 3.3 volt power supply; therefore, we used a 3.3V regulator to produce a fixed 3.3V output from the 5V power supply. As expected, the output was connected to pin 8 (VCC) on the ESP8266 wifi module and then connected to the appropriate pins on the PIC32. 
+                </p>
+                <p class="lead">
+                  One of the peripherals that was added to our nodes was an led. The led was super useful in testing our algorithms and visualizing the behavior of our system. The led would constantly blink when the node was searching for a connection, and then stay lit up when it connected to another node. Therefore, if we expected a connection to occur, or had an unexpected connection, the led would be an easy visual to identify an issue. Likewise, if the led acted accordingly to the expected behavior, it would help confirm the functionality of our node.  
+                </p>
+                <p class="lead">
+                  As shown in the schematic below, each of our nodes have four sockets: the microstick socket, the UART socket, and the wifi socket, and the PIC32 socket. Having sockets for each of our most important parts allows us to easily swap out components. It follows that having sockets allows us to replace faulty parts with ease. 
+                </p>
+                <p class="lead">
+                  Another key aspect of the hardware design was the inclusion of the wifi debug jumpers. As shown in the schematic below, pin 1 of the wifi debugger is connected to RB7 while pin 2 is connected to RA2. Since RB7 was connected to TX on the ESP8266 and RA2 is connected to RX, the inclusion of wifi jumpers led to fairly easy debugging on the wifi module. 
+                </p>
+                <p class="lead">
+                  Here is the schematic of mesh nodes:
+                </p>
+                <img src="img/schematic.jpg">
                 <p class="lead">
                   Here are some images of the final boards:
                 </p>
@@ -104,11 +123,11 @@
                 <img src="img/board4.jpg">
                 <h3>ESP8266 Firmware Flashing</h3>
                 <p class="lead">
-                  In order to get the most up to data AT commands working on the ESP8266 modules, we decided to flash the latest firmware from Espressif. In order to do this, we had to add a button to reset the ESP8266 module by pulling the reset pin low and add a button to pull the GPIO_0 pin from floating to low. This put the module in a state to be programmed. We then used the firmware flashing feature of Espressif’s esptool python script to flash the firmware to the modules through the USB to UART cable.
+                  In order to get the most up to date AT commands working on the ESP8266 modules, we decided to flash the latest firmware from Espressif. In order to do this, we had to add a button to reset the ESP8266 module by pulling the reset pin low and add a button to pull the GPIO_0 pin from floating to low (this circuit can be seen in the wifi socket section of the schematic). This put the module in a state to be programmed. We then used the firmware flashing feature of Espressif’s esptool python script to flash the firmware to the modules through the USB to UART cable.
                 </p>
               <h2 id="software" class="mt-4">Software Design</h2>
                 <p class="lead">
-                    The software design was largely influence by the constraints of the hardware we were working with, namely the ESP8266 wifi modules. Wifi devices are typically either configured as stations or access points. A station is a device like your computer, which can connect to one wifi network at a time. An access point is something like a router, which allows many stations to connect to it and acts as a kind of local hub for connecting wifi devices. The ESP8266 wifi modules actually allow a third mode which is a hybrid of the two. A single chip can act as both a station and an access point. However, it limits the total number of connects to 5. 4 connections to its access point and its one station connection.
+                    The software design was largely influenced by the constraints of the hardware we were working with, namely the ESP8266 wifi modules. Wifi devices are typically either configured as stations or access points. A station is a device like your computer, which can connect to one wifi network at a time. An access point is something like a router, which allows many stations to connect to it and acts as a kind of local hub for connecting wifi devices. The ESP8266 wifi modules actually allow a third mode which is a hybrid of the two. A single chip can act as both a station and an access point. However, it limits the total number of connects to 5. 4 connections to its access point and its one station connection.
                 </p>
                 <p class="lead">
                     These connectivity restrictions inform the kind of mesh network we can create. Since the number of edges in the network is limited to the number of devices (since a station can only connect to a single access point) we can’t really make a very fault tolerant network. Therefore, we decided to focus on software that tries to connect as many of the devices as possible in a fully connected mesh. Although not rigorously proven, we believe that the algorithms we designed allow for the maximum number of nodes to be connected in an arbitrary mesh configuration. In order to accomplish this, we split the software into 4 logically separate layers: Wifi, Routing, Topology, and Application.
@@ -138,7 +157,7 @@
                       In order to stop flood messages from infinitely propagating throughout the network we use the concept of sequence numbers. Each node maintains its own monotonically increasing sequence number, which it increases with each message that it creates. Every flood message has an origin node and the sequence number of that origin node when the flood message was created. Each node keeps track of the highest sequence number that it has seen from each node in the network. When a node sees a new message from origin node O with sequence number N, it checks to see if N is greater than the largest sequence number previously seen from O. If it is, then the node accepts the message and updates the largest sequence number to N. Otherwise, the node discards the message.
                     </p>
                     <p class="lead">
-                      Since all of the connections between nodes are TCP connections, we guarantee in order delivery and successful transmission (unless disconnection) of all packets between nodes. Due to this property, we can make some claims about the eventual consistency of the state of each node. We can guarantee that each node will eventually see the correct view of the network, even if edges are created and destroyed elsewhere in the network. As shown in the above diagram, edge creation messages are flooded by the station. Edge deletion messages will be flooded by both endpoints. However, in order to keep the network consistent, the access point will flood the edge removal as if it is coming from the station (by setting the originating node to the station and the sequence number to the sequence number of the station node). This means that whenever the station wants to increment its sequence number, it needs to let that access point it is connect to know about the increment. Since all edge modification events appear to come from the station connection, there is never a case where a node receives an inconsistent message based on its message history. Additionally, when a station receives a bootstrap message, it broadcasts the edge creation messages as if they had come from the original stations, meaning that when two node partitions are finally connected they will receive all of the edge creation messages as if they were just sent.
+                      Since all of the connections between nodes are TCP connections, we guarantee in order delivery and successful transmission (unless disconnection) of all packets between nodes. Due to this property, we can make some claims about the eventual consistency of the state of each node. We can guarantee that each node will eventually see the correct view of the network, even if edges are created and destroyed elsewhere in the network. As shown in the above diagram, edge creation messages are flooded by the station. Edge deletion messages will be flooded by both endpoints. However, in order to keep the network consistent, the access point will flood the edge removal as if it is coming from the station (by setting the originating node to the station and the sequence number to the sequence number of the station node). This means that whenever the station wants to increment its sequence number, it needs to let the access point it is connected to know about the increment. Since all edge modification events appear to come from the station connection, there is never a case where a node receives an inconsistent message based on its message history. Additionally, when a station receives a bootstrap message, it broadcasts the edge creation messages as if they had come from the original stations, meaning that when two node partitions are finally connected they will receive all of the edge creation messages as if they were just sent.
                   </p>
                 <h3>Topology Layer</h3>
                   <p class="lead">
@@ -153,7 +172,7 @@
                     </p>
                     <img src="img/rev_1.png">
                     <p class="lead">
-                        Then a node N that runs the edge reversal algorithm looks for nodes which are visible to N but not in N’s graph. If such a node exists, N tries to find a reversible path in its graph, which is a path ending in a node with out degree 0. It will then tell every node along that path to disconnect from its access point and connect to the previous node in the path. After this is done, the network will still have the same connectivity and now N will have out degree 0, meaning it can connected to the node that was visible but not in the network. In the above network, let's assume that B completed the edge reversal process first. Then the resulting network will look like so:
+                        Then a node N that runs the edge reversal algorithm looks for nodes which are visible to N but not in N’s graph. If such a node exists, N tries to find a reversible path in its graph, which is a path ending in a node with out degree 0. It will then tell every node along that path to disconnect from its access point and connect to the previous node in the path. After this is done, the network will still have the same connectivity and now N will have out degree 0, meaning it can connect to the node that was visible but not in the network. In the above network, let's assume that B completed the edge reversal process first. Then the resulting network will look like so:
                       </p>
                       <img src="img/rev_2.png">
                       <p class="lead">
@@ -218,73 +237,61 @@
                   Cost breakdown:
                 </p>
                 <table class="tg">
-                    <tr>
-                      <th class="tg-0pky">Item</th>
-                      <th class="tg-0pky">Cost</th>
-                      <th class="tg-0pky">Quantity</th>
-                      <th class="tg-0pky">Total Cost</th>
-                    </tr>
-                    <tr>
-                      <td class="tg-0pky">ESP8266</td>
-                      <td class="tg-0pky">3</td>
-                      <td class="tg-0pky">5.35</td>
-                      <td class="tg-0pky">16.05</td>
-                    </tr>
-                    <!-- <tr>
-                      <td class="tg-0pky">IR distance sensors</td>
-                      <td class="tg-0pky">7</td>
-                      <td class="tg-0pky">3</td>
-                      <td class="tg-0pky">21</td>
-                    </tr>
-                    <tr>
-                      <td class="tg-0pky">Camera</td>
-                      <td class="tg-0pky">14</td>
-                      <td class="tg-0pky">1</td>
-                      <td class="tg-0pky">14</td>
-                    </tr>
-                    <tr>
-                      <td class="tg-0pky">Servos</td>
-                      <td class="tg-0pky">13</td>
-                      <td class="tg-0pky">2</td>
-                      <td class="tg-0pky">26</td>
-                    </tr>
-                    <tr>
-                      <td class="tg-0pky">Arduino Uno</td>
-                      <td class="tg-0pky">16</td>
-                      <td class="tg-0pky">1</td>
-                      <td class="tg-0pky">16</td>
-                    </tr>
-                    <tr>
-                      <td class="tg-0pky">atmega328p</td>
-                      <td class="tg-0pky">4.30</td>
-                      <td class="tg-0pky">1</td>
-                      <td class="tg-0pky">4.30</td>
-                    </tr>
-                    <tr>
-                      <td class="tg-0pky">lm358</td>
-                      <td class="tg-0pky">0.60</td>
-                      <td class="tg-0pky">1</td>
-                      <td class="tg-0pky">0.60</td>
-                    </tr>
-                    <tr>
-                      <td class="tg-0pky">Perf board</td>
-                      <td class="tg-0pky">2.00</td>
-                      <td class="tg-0pky">2</td>
-                      <td class="tg-0pky">4.00</td>
-                    </tr>
-                    <tr>
-                      <td class="tg-0pky">IR hat</td>
-                      <td class="tg-0pky">2.00</td>
-                      <td class="tg-0pky">1</td>
-                      <td class="tg-0pky">2.00</td>
-                    </tr> -->
-                    <tr>
-                      <td class="tg-0pky">Total</td>
-                      <td class="tg-0pky"></td>
-                      <td class="tg-0pky"></td>
-                      <td class="tg-0pky">96.90</td>
-                    </tr>
-                  </table>
+                  <tr>
+                    <th class="tg-0pky">Item</th>
+                    <th class="tg-0pky">Cost</th>
+                    <th class="tg-0pky">Quantity</th>
+                    <th class="tg-0pky">Total Cost</th>
+                  </tr>
+                  <tr>
+                    <td class="tg-0pky"><a href="https://www.allelectronics.com/item/esp-8266/wifi-module-esp8266/1.html">ESP8266</a></td>
+                    <td class="tg-0pky">5.35</td>
+                    <td class="tg-0pky">3</td>
+                    <td class="tg-0pky">16.05</td>
+                  </tr>
+                  <tr>
+                    <td class="tg-0pky"><a href="https://www.adafruit.com/product/954">USB-TTL cable</a></td>
+                    <td class="tg-0pky">9.95</td>
+                    <td class="tg-0pky">3</td>
+                    <td class="tg-0pky">29.85</td>
+                  </tr>
+                  <tr>
+                    <td class="tg-0pky">Small board</td>
+                    <td class="tg-0pky">4</td>
+                    <td class="tg-0pky">1</td>
+                    <td class="tg-0pky">4</td>
+                  </tr>
+                  <tr>
+                    <td class="tg-0pky">White board</td>
+                    <td class="tg-0pky">6</td>
+                    <td class="tg-0pky">1</td>
+                    <td class="tg-0pky">6</td>
+                  </tr>
+                  <tr>
+                    <td class="tg-0pky">Small solder board</td>
+                    <td class="tg-0pky">1</td>
+                    <td class="tg-0pky">2</td>
+                    <td class="tg-0pky">2</td>
+                  </tr>
+                  <tr>
+                    <td class="tg-0pky">5V power supply</td>
+                    <td class="tg-0pky">5</td>
+                    <td class="tg-0pky">3</td>
+                    <td class="tg-0pky">15</td>
+                  </tr>
+                  <tr>
+                    <td class="tg-0pky">PIC32MX250F128B</td>
+                    <td class="tg-0pky">5</td>
+                    <td class="tg-0pky">3</td>
+                    <td class="tg-0pky">15</td>
+                  </tr>
+                  <tr>
+                    <td class="tg-0pky">Total</td>
+                    <td class="tg-0pky"></td>
+                    <td class="tg-0pky"></td>
+                    <td class="tg-0pky">87.90</td>
+                  </tr>
+                </table>
                 <h3>Appendix E</h3>
                 <p class="lead">
                   Task Breakdown:
